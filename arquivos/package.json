@@ -1,0 +1,3 @@
+{ "name": "planner-arquivos", "version": "2.1.0", "private": true, "type": "module",
+  "description": "Armazena anexos e logotipo do Planner (compatível com a API do Supabase Storage usada pela interface).",
+  "scripts": { "start": "node index.mjs", "test": "node test/arquivos.test.mjs" }, "engines": { "node": ">=20" } }

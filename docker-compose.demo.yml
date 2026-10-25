@@ -1,0 +1,9 @@
+# Modo demonstração: só a interface, com dados de exemplo no navegador (sem banco).
+name: planner-demo
+services:
+  web:
+    build: ./web
+    ports: ["${PORTA_WEB:-8080}:80"]
+    environment:
+      SUPABASE_URL_PUBLICA: ""
+      SUPABASE_ANON_KEY: ""

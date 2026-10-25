@@ -1,0 +1,24 @@
+# Uso com Supabase na NUVEM (supabase.com): sobe só interface e notificador.
+# Preencha no .env: SUPABASE_URL_NUVEM, ANON_KEY e SERVICE_ROLE_KEY do projeto, e o SMTP.
+name: planner-nuvem
+services:
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports: ["${PORTA_WEB:-8080}:80"]
+    environment:
+      SUPABASE_URL_PUBLICA: ${SUPABASE_URL_NUVEM}
+      SUPABASE_ANON_KEY: ${ANON_KEY}
+      NOME_SISTEMA: ${NOME_SISTEMA:-Planner de Setores}
+  notificador:
+    build: ./notificador
+    restart: unless-stopped
+    environment:
+      SUPABASE_URL: ${SUPABASE_URL_NUVEM}
+      SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_SEGURO: ${SMTP_SEGURO:-false}
+      SMTP_USUARIO: ${SMTP_USUARIO}
+      SMTP_SENHA: ${SMTP_SENHA}
+      SMTP_REMETENTE: ${SMTP_NOME_REMETENTE} <${SMTP_EMAIL_REMETENTE}>

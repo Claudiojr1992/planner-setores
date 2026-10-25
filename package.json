@@ -1,0 +1,12 @@
+{
+  "name": "planner-setores",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Planner de Setores — planejamento de atividades e processos entre setores. Interface em web/, notificador em notificador/, função da Vercel em api/.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "npm --prefix web run build",
+    "test": "node notificador/test/notificador.test.mjs && node arquivos/test/arquivos.test.mjs"
+  }
+}

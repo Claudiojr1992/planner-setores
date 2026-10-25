@@ -1,0 +1,9 @@
+{
+  "name": "planner-notificador",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Entrega as notificações do Planner por e-mail (SMTP) e Microsoft Teams. Sem dependências.",
+  "type": "module",
+  "scripts": { "start": "node index.mjs", "test": "node test/notificador.test.mjs" },
+  "engines": { "node": ">=20" }
+}
