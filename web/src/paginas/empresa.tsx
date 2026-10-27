@@ -63,7 +63,7 @@ export function GestaoEmpresa() {
           <div className="lista-cartoes" style={{ maxHeight: 548, overflowY: 'auto', paddingRight: 4 }}>{lista.length ? lista.map(a => <Cartao key={a.id} a={a} arrastavel acoes={false} mostrarSetor />) : <Vazio>Nenhuma atividade sua ou do seu setor em aberto.</Vazio>}</div>
         </div>
         <Grafo nos={nos} arestas={arestas} selecao={sel} onSelecionar={setSel} editavel={editavel} altura={640}
-          dica={editavel ? <span className="row"><LuMousePointer2 size={14} />Arraste da <b style={{ color: 'var(--accent)' }}>●</b> à direita de um setor até outro para criar um vínculo.</span> : undefined}
+          dica={editavel ? <span><LuMousePointer2 size={14} style={{ verticalAlign: '-2px', marginRight: 6 }} />Puxe a bolinha <b style={{ color: 'var(--accent)' }}>●</b> do lado direito de um setor até outro para criar um vínculo.</span> : undefined}
           onMover={(id, x, y) => { if (gere(eu, id, dados.setores)) setPos(p => ({ ...p, [id]: { x, y } })); }}
           onMoverFim={(id, x, y) => { svc.moverSetor(id, x, y).catch(() => undefined); }}
           onConectar={(de, para) => { if (vinculoEntre(dados.vinculos, de, para)) { setSel({ tipo: 'aresta', id: vinculoEntre(dados.vinculos, de, para)!.id }); return; } setNova({ de, para }); }}

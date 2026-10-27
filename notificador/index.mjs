@@ -28,17 +28,18 @@ async function rest(metodo, caminho, corpo) {
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 function htmlEmail(empresa, e, nome) {
-  return `<!doctype html><html><body style="margin:0;background:#f3f5f9;font-family:Segoe UI,Arial,sans-serif;color:#0e1726">
+  const cor = /^#[0-9a-f]{6}$/i.test(empresa.cor_primaria || '') ? empresa.cor_primaria : '#0b7a75';
+  return `<!doctype html><html><body style="margin:0;background:#f3f5f4;font-family:Segoe UI,Arial,sans-serif;color:#14222e">
 <table width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px"><tr><td align="center">
-<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #e1e6ee;border-radius:14px;overflow:hidden">
-<tr><td style="background:#0b1424;padding:16px 24px;color:#fff;font-weight:700;font-size:15px">${empresa.logo_url ? `<img src="${esc(empresa.logo_url)}" alt="" height="28" style="vertical-align:middle;background:#fff;border-radius:6px;padding:2px 4px;margin-right:10px">` : ''}${esc(empresa.nome)} · Planner de Setores</td></tr>
+<table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border:1px solid #dfe5e2;border-radius:14px;overflow:hidden">
+<tr><td style="background:#14222e;border-bottom:3px solid ${cor};padding:16px 24px;color:#fff;font-weight:700;font-size:15px">${empresa.logo_url ? `<img src="${esc(empresa.logo_url)}" alt="" height="28" style="vertical-align:middle;background:#fff;border-radius:6px;padding:2px 4px;margin-right:10px">` : ''}${esc(empresa.nome)} · Planner de Setores</td></tr>
 <tr><td style="padding:24px">
 ${nome ? `<p style="margin:0 0 8px;color:#6b7789;font-size:13px">Olá, ${esc(nome.split(' ')[0])}</p>` : ''}
 <h1 style="margin:0 0 12px;font-size:19px">${esc(e.assunto)}</h1>
 <p style="margin:0 0 20px;font-size:14px;line-height:1.55;color:#3b4658">${esc(e.corpo).replace(/\n/g, '<br>')}</p>
-${e.link ? `<a href="${esc(e.link)}" style="display:inline-block;background:#2152d9;color:#fff;text-decoration:none;padding:10px 18px;border-radius:9px;font-weight:600;font-size:14px">Abrir no Planner</a>` : ''}
+${e.link ? `<a href="${esc(e.link)}" style="display:inline-block;background:${cor};color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;font-weight:600;font-size:14px">Abrir no Planner</a>` : ''}
 </td></tr>
-<tr><td style="padding:14px 24px;border-top:1px solid #e1e6ee;color:#6b7789;font-size:11.5px">Você recebe este e-mail porque as notificações por e-mail estão ativas no seu perfil.</td></tr>
+<tr><td style="padding:14px 24px;border-top:1px solid #dfe5e2;color:#66747d;font-size:11.5px">Você recebe este e-mail porque as notificações por e-mail estão ativas no seu perfil.</td></tr>
 </table></td></tr></table></body></html>`;
 }
 

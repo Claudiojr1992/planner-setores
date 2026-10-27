@@ -9,22 +9,42 @@
 
 ## Para todos — Início
 
-1. **Meu fluxo de trabalho**: cada atividade sua aparece com o setor de onde veio e os setores para onde vai depois.
-2. **Indicadores**: clique em um deles para abrir a lista já filtrada.
-3. **Minhas atividades**: alterne entre *Minha fila*, *Que solicitei* (para acompanhar pedidos a outros setores) e *Concluídas*.
-4. **Calendário**: mostra os prazos e as suas ausências.
+O Início é a sua mesa de trabalho.
 
-Use os botões do cartão: **Iniciar** → **Pausar/Retomar** → **Concluir**. Ao clicar no cartão, abre o detalhe, com resumo, trilha do processo, comentários, anexos e histórico.
+1. **Resumo do dia** (no topo, à direita): mostra quantas atividades suas estão atrasadas, quantas vencem hoje, quantas estão em andamento e quantos pedidos você fez. Clique em um número para ir direto ao grupo.
+2. **Meu fluxo**: mostra cada atividade sua com o setor de onde veio e o setor para onde segue. Use *Recolher* se não precisar dele.
+3. **Precisa de você** (somente gestores): reúne os pedidos aguardando aceite e as atividades a distribuir, com o botão certo em cada linha.
+4. **Minhas atividades**:
+   - *Minha fila* fica em ordem de urgência: Atrasadas, Vencem hoje, Em andamento, Próximas e Pausadas;
+   - *Que solicitei* serve para acompanhar o que você pediu a outros setores;
+   - *Concluídas* lista as atividades que você terminou.
+5. **Agenda**: mostra os próximos 7 dias, com o que vence em cada um. Em *Mês*, aparece o calendário completo, com as suas ausências.
+6. **Meus últimos 30 dias**: concluídas, percentual no prazo e tempo médio de entrega.
+
+Cada linha tem **uma ação principal**, que é o próximo passo: *Iniciar*, *Concluir*, *Retomar*, *Aceitar* ou *Distribuir*. As outras ações (pausar, recusar, enviar para outro setor) ficam no botão **⋯**. Ao clicar na linha, abre o detalhe, que começa com o **próximo passo** em uma frase. Depois vêm o resumo, o trilho entre setores, comentários, anexos e histórico.
+
+O **trilho de passagem** aparece em cada atividade: `setor de origem —— setor atual - - - próximo setor`, nas cores dos setores. A linha cheia indica o caminho já percorrido; a tracejada, o que vem depois.
+
+### Atalhos de teclado
+
+| Tecla | Ação |
+|---|---|
+| `N` | Nova solicitação |
+| `/` | Buscar atividade |
+| `Ctrl` + `Enter` | Enviar o formulário aberto |
+| `Esc` | Fechar janelas, menus e o detalhe |
 
 ### Fazer uma solicitação
 
-1. Clique em **+ Nova solicitação**.
-2. Escolha um dos caminhos:
-   - **Atividade do meu setor**: entra na fila do seu setor (para você ou para o gestor distribuir);
-   - **Solicitar a outro setor**: a lista mostra só os setores vinculados ao seu e indica se exigem aceite;
-   - **Iniciar um processo**: escolha um fluxo e dê um nome a esta execução (ex.: "Onboarding – Cliente X").
-3. Preencha título, descrição, prioridade, prazo e anexos.
-4. Confira a caixa **"O que vai acontecer"** e envie.
+1. Clique em **Nova solicitação** ou aperte `N`.
+2. Em **Para onde vai?**, escolha:
+   - **Para o meu setor**: entra na fila do seu setor;
+   - **Para outro setor**: escolha o setor nos botões. Só aparecem os setores vinculados ao seu, com a indicação "com aceite" ou "direto";
+   - **Iniciar um processo**: escolha o fluxo e dê um nome a esta execução (ex.: "Onboarding – Cliente X").
+3. Escreva **o que precisa ser feito** e os detalhes.
+4. Escolha o **prazo** (*Hoje*, *Amanhã*, *Em 3 dias*, *Em 1 semana* ou uma data) e a **prioridade**.
+5. Se precisar, abra **Mais opções** para informar início, responsável, para onde enviar ao concluir e anexos.
+6. Confira o caminho no resumo e envie, com o botão ou com `Ctrl` + `Enter`.
 
 ### Concluir e encaminhar
 
@@ -67,6 +87,13 @@ Antes de usar com a equipe, troque as senhas.
 ## Para gestores
 
 ### Painel do setor
+A página segue a ordem do trabalho do gestor:
+1. **indicadores**;
+2. **Aguardando aceite** e **A distribuir** (o que depende de você);
+3. **Mapa da equipe**, que pode ser recolhido;
+4. **Filas por pessoa**;
+5. calendário e ausências.
+
 - **Mapa da equipe**: mostra o que entra de outros setores, quem está fazendo o quê (com carga e atrasos) e para onde as atividades seguem.
 - **Aguardando aceite**:
   - **Aceitar** permite já escolher o responsável e ajustar o prazo;
@@ -103,5 +130,5 @@ No retorno, clique em **Devolver** na linha da ausência. Também é possível d
   - aprove novos cadastros (defina setor e papel);
   - edite cargos;
   - bloqueie acessos.
-- **Empresa e marca**: nome e **logotipo**, que aparece no menu, no login e nos e-mails.
+- **Empresa e marca**: nome, **cor da marca** e **logotipo**. Eles aparecem no menu, nos botões, no login e nos e-mails. A cor é pré-visualizada no sistema inteiro antes de você clicar em *Salvar marca*. Veja [09-IDENTIDADE-VISUAL.md](09-IDENTIDADE-VISUAL.md).
 - **Integrações**: ative e-mail e Teams, cole os webhooks dos canais, use **Testar** e acompanhe o **Registro de envios**.

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   LuHouse, LuListChecks, LuLayoutDashboard, LuTreePalm, LuNetwork, LuWorkflow, LuBuilding2, LuUsers, LuImage, LuPlug,
@@ -8,7 +8,7 @@ import { useDados, type Tema } from '../app/contexto';
 import { navegar } from '../app/rota';
 import { NOME_SISTEMA } from '../app/config';
 import { PAPEL, ehAdmin, ehGestor, setoresGeridos, tempoRelativo } from '../lib/regras';
-import { Avatar, Suspenso } from '../ui/base';
+import { Avatar, Kbd, Marca, Suspenso } from '../ui/base';
 
 interface Item { para: string; rotulo: string; Ic: typeof LuHouse; cont?: number; alerta?: boolean }
 
@@ -17,13 +17,24 @@ export function Estrutura({ caminho, titulo, children }: { caminho: string; titu
   const [colapsado, setColapsado] = useState(() => { try { return localStorage.getItem('planner.menu') === '1'; } catch { return false; } });
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState('');
+  const buscaRef = useRef<HTMLInputElement>(null);
+  // atalhos: N = nova solicitação, / = buscar
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable || document.querySelector('.veu, .gaveta')) return;
+      if (e.key === 'n' || e.key === 'N') { e.preventDefault(); abrirNova(); }
+      else if (e.key === '/') { e.preventDefault(); if (buscaRef.current && buscaRef.current.offsetParent) buscaRef.current.focus(); else navegar('/atividades'); }
+    };
+    window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k);
+  }, [abrirNova]);
   const admin = ehAdmin(eu), gestor = ehGestor(eu, dados.setores);
   const geridos = setoresGeridos(eu, dados.setores);
   const pendSetor = dados.atividades.filter(a => geridos.includes(a.setor_id) && (a.status === 'aguardando_aceite' || a.status === 'a_distribuir')).length;
   const minhas = dados.atividades.filter(a => a.responsavel_id === eu.id && ['na_fila', 'em_andamento', 'pausada'].includes(a.status)).length;
   const pendentes = dados.perfis.filter(p => !p.ativo).length;
   const grupos: { titulo: string; itens: Item[] }[] = [
-    { titulo: 'Trabalho', itens: [{ para: '/', rotulo: 'Início', Ic: LuHouse, cont: minhas }, { para: '/atividades', rotulo: 'Atividades', Ic: LuListChecks }] },
+    { titulo: 'Meu trabalho', itens: [{ para: '/', rotulo: 'Início', Ic: LuHouse, cont: minhas }, { para: '/atividades', rotulo: 'Atividades', Ic: LuListChecks }] },
   ];
   if (gestor) grupos.push({ titulo: 'Gestão', itens: [
     { para: '/setor', rotulo: 'Painel do setor', Ic: LuLayoutDashboard, cont: pendSetor, alerta: pendSetor > 0 },
@@ -38,6 +49,7 @@ export function Estrutura({ caminho, titulo, children }: { caminho: string; titu
     { para: '/configuracoes/integracoes', rotulo: 'Integrações', Ic: LuPlug },
   ] });
   const ativo = (p: string) => p === '/' ? caminho === '/' : caminho.startsWith(p);
+  const grupoAtual = grupos.find(g => g.itens.some(it => ativo(it.para)))?.titulo;
   const alternar = () => {
     if (window.innerWidth <= 900) { setAberto(!aberto); return; }
     setColapsado(c => { try { localStorage.setItem('planner.menu', c ? '0' : '1'); } catch { /* */ } return !c; });
@@ -48,8 +60,8 @@ export function Estrutura({ caminho, titulo, children }: { caminho: string; titu
   return <div className={`app ${colapsado ? 'colapsado' : ''} ${aberto ? 'menu-aberto' : ''}`}>
     <aside className="side">
       <div className="side-marca">
-        {dados.empresa.logo_url ? <img src={dados.empresa.logo_url} alt={dados.empresa.nome} /> : <span className="logo-pad"><LuWorkflow size={18} /></span>}
-        <div className="txt" style={{ minWidth: 0 }}><div className="nome ellipsis">{dados.empresa.logo_url ? NOME_SISTEMA : dados.empresa.nome}</div><div className="sub ellipsis">{dados.empresa.logo_url ? dados.empresa.nome : NOME_SISTEMA}</div></div>
+        <Marca logo={dados.empresa.logo_url} nome={dados.empresa.nome} />
+        <div className="txt" style={{ minWidth: 0 }}><div className="nome ellipsis">{dados.empresa.nome}</div><div className="sub ellipsis">{NOME_SISTEMA}</div></div>
       </div>
       <nav>{grupos.map(g => <div key={g.titulo}>
         <div className="grupo">{g.titulo}</div>
@@ -66,10 +78,10 @@ export function Estrutura({ caminho, titulo, children }: { caminho: string; titu
     <div className="main">
       <header className="top">
         <button className="btn fant icone" onClick={alternar} aria-label="Menu">{aberto || colapsado ? <LuPanelLeft size={18} className="desk-only" /> : <LuPanelLeftClose size={18} className="desk-only" />}<LuMenu size={18} className="mobile-only" /></button>
-        <div className="crumb"><span className="sub desk-only">{dados.empresa.nome}</span><span className="sub desk-only">/</span><b className="ellipsis">{titulo}</b>{modo === 'demo' && <span className="pill t-amber desk-only">Demonstração</span>}</div>
-        <form className="busca" onSubmit={e => { e.preventDefault(); navegar(`/atividades?q=${encodeURIComponent(busca)}`); }}><LuSearch size={15} /><input placeholder="Buscar atividade por título ou número…" value={busca} onChange={e => setBusca(e.target.value)} /></form>
+        <div className="crumb">{grupoAtual && <><span className="desk-only">{grupoAtual}</span><span className="sep-c desk-only">/</span></>}<b className="ellipsis">{titulo}</b>{modo === 'demo' && <span className="pill t-amber desk-only">Demonstração</span>}</div>
+        <form className="busca" role="search" onSubmit={e => { e.preventDefault(); navegar(`/atividades?q=${encodeURIComponent(busca)}`); }}><LuSearch size={15} /><input ref={buscaRef} aria-label="Buscar atividades" placeholder="Buscar por título ou número" value={busca} onChange={e => setBusca(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.currentTarget.blur())} /><Kbd>/</Kbd></form>
         <div className="acoes">
-          <button className="btn pri" onClick={() => abrirNova()}><LuPlus size={16} /><span className="rot-m">Nova solicitação</span></button>
+          <button className="btn pri" onClick={() => abrirNova()} title="Nova solicitação (atalho N)"><LuPlus size={16} /><span className="rot-m">Nova solicitação</span><Kbd>N</Kbd></button>
           <BotaoTema />
           <Notificacoes />
           <MenuUsuario onSair={() => navegar('/sair')} />

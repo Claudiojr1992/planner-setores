@@ -5,7 +5,7 @@ export type Status =
 export type Prioridade = 'baixa' | 'media' | 'alta' | 'urgente';
 export type TipoAusencia = 'ferias' | 'licenca' | 'folga' | 'outro';
 
-export interface Empresa { id: number; nome: string; logo_url: string | null; atualizado_em?: string }
+export interface Empresa { id: number; nome: string; logo_url: string | null; cor_primaria?: string | null; atualizado_em?: string }
 
 export interface Perfil {
   id: string; nome: string; email: string; cargo: string | null;

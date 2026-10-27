@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { DragEvent } from 'react';
-import { LuDownload, LuPlus, LuFilterX, LuKanban, LuList, LuSend } from 'react-icons/lu';
+import { LuDownload, LuFilterX, LuKanban, LuList, LuSend } from 'react-icons/lu';
 import { useDados } from '../app/contexto';
 import type { Rota } from '../app/rota';
 import type { Atividade, Status } from '../lib/types';
@@ -11,7 +11,7 @@ import { Cartao, useAcoes } from '../ui/atividade';
 const CHAVE_VISAO = 'planner.atividades.visao';
 
 export function Atividades({ rota }: { rota: Rota }) {
-  const { dados, eu, abrirAtividade, abrirNova } = useDados();
+  const { dados, eu, abrirAtividade } = useDados();
   const q0 = rota.query;
   const [f, setF] = useState({ q: q0.get('q') || '', setor: q0.get('setor') || '', status: q0.get('f') || 'abertas', resp: q0.get('resp') === 'eu' ? eu.id : q0.get('resp') || '', pri: '', fluxo: '' });
   useEffect(() => { setF(x => ({ ...x, q: q0.get('q') ?? x.q, setor: q0.get('setor') ?? x.setor, status: q0.get('f') ?? x.status, resp: q0.get('resp') === 'eu' ? eu.id : (q0.get('resp') ?? x.resp) })); }, [rota.query.toString()]); // eslint-disable-line
@@ -51,7 +51,7 @@ export function Atividades({ rota }: { rota: Rota }) {
   return <>
     <div className="cabeca"><div className="t"><h1>Atividades</h1><p>{lista.length} de {visiveis.length} atividades</p></div>
       <div className="sp"><div className="segmento"><button className={visao === 'quadro' ? 'on' : ''} onClick={() => trocarVisao('quadro')}><LuKanban size={14} /> Quadro</button><button className={visao === 'lista' ? 'on' : ''} onClick={() => trocarVisao('lista')}><LuList size={14} /> Lista</button></div>
-        <button className="btn" onClick={exportar}><LuDownload size={15} />Exportar CSV</button><button className="btn pri" onClick={() => abrirNova()}><LuPlus size={16} />Nova solicitação</button></div></div>
+        <button className="btn" onClick={exportar}><LuDownload size={15} />Exportar CSV</button></div></div>
     <Painel>
       <div className="filtros">
         <Campo rotulo="Buscar" classe="grow"><input className="inp" placeholder="Título, descrição ou número" value={f.q} onChange={e => setF({ ...f, q: e.target.value })} /></Campo>

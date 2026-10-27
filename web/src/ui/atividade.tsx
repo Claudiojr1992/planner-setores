@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   LuArrowRight, LuCheck, LuPlay, LuPause, LuX, LuPaperclip, LuMessageSquare, LuHistory, LuFileText, LuTrash2,
-  LuDownload, LuPencil, LuRotateCcw, LuUpload, LuCalendar, LuUser, LuGitBranch, LuSend, LuWorkflow, LuBuilding2,
+  LuDownload, LuPencil, LuRotateCcw, LuUpload, LuCalendar, LuUser, LuGitBranch, LuSend, LuWorkflow,
   LuInbox, LuChevronRight, LuCircleStop, LuUndo2, LuClock, LuEllipsis,
 } from 'react-icons/lu';
 import type { Anexo, Atividade, Dados, Perfil, Prioridade } from '../lib/types';
@@ -13,7 +13,7 @@ import {
 } from '../lib/regras';
 import type { Detalhe, NovaAtividade } from '../lib/servico';
 import { useApp, useDados } from '../app/contexto';
-import { Avatar, Aviso, Campo, Modal, PillStatus, PontoSetor, Pri, Suspenso, Vazio, tamanhoArquivo } from './base';
+import { Avatar, Aviso, Campo, Elo, Kbd, Modal, PillStatus, PontoSetor, Pri, Suspenso, Vazio, tamanhoArquivo, type NoElo } from './base';
 
 /* ===================== modais de ação (host global) ===================== */
 type AcaoModal = { tipo: 'aceitar' | 'concluir' | 'editar'; a: Atividade } | { tipo: 'solicitar'; a: Atividade; destino: string };
@@ -50,16 +50,50 @@ export function useAcoes() {
   };
 }
 
+/* ===================== trilho de passagem da atividade ===================== */
+/** Setor de onde veio → setor atual → próximos setores (fluxo ou encaminhamento). */
+export function nosDaAtividade(a: Atividade, dados: Dados, abrir?: (id: string) => void): NoElo[] {
+  const setor = (id?: string | null) => dados.setores.find(x => x.id === id) || null;
+  const o = a.origem_id ? dados.atividades.find(x => x.id === a.origem_id) : null;
+  const deOnde = o && o.setor_id !== a.setor_id ? o.setor_id : a.solicitante_setor_id && a.solicitante_setor_id !== a.setor_id ? a.solicitante_setor_id : null;
+  const f = a.fluxo_id ? dados.fluxos.find(x => x.id === a.fluxo_id) : null;
+  const prox = aberta(a) ? (f && a.etapa_id ? proximosNos(f, a.etapa_id).map(n => n.setor_id) : a.encaminhar_para ? [a.encaminhar_para] : []) : [];
+  const nos: NoElo[] = [];
+  if (deOnde) nos.push({ setor: setor(deOnde), titulo: 'Veio deste setor', onClick: o && abrir ? () => abrir(o.id) : undefined });
+  nos.push({ setor: setor(a.setor_id), atual: true, titulo: 'Está neste setor' });
+  [...new Set(prox)].filter(Boolean).slice(0, 2).forEach(id => nos.push({ setor: setor(id), previsto: true, titulo: 'Segue para este setor ao concluir' }));
+  return nos;
+}
+
+/* ===================== ações: uma principal, o resto no menu ===================== */
+interface Op { k: string; rotulo: string; Ic: typeof LuCheck; fn: () => void; perigo?: boolean }
+function opcoesDe(a: Atividade, eu: Perfil, dados: Dados, ac: ReturnType<typeof useAcoes>) {
+  const gestor = gere(eu, a.setor_id, dados.setores);
+  const exec = podeExecutar(eu, a, dados.setores);
+  const ops: Op[] = [];
+  let distribuir = false;
+  if (a.status === 'aguardando_aceite') {
+    if (gestor) ops.push({ k: 'aceitar', rotulo: 'Aceitar', Ic: LuCheck, fn: () => ac.aceitar(a) }, { k: 'recusar', rotulo: 'Recusar', Ic: LuX, fn: () => ac.recusar(a), perigo: true });
+  } else if (a.status === 'a_distribuir') {
+    if (gestor) distribuir = true;
+    if (eu.setor_id === a.setor_id) ops.push({ k: 'assumir', rotulo: 'Assumir e iniciar', Ic: LuPlay, fn: () => ac.iniciar(a) });
+  } else if (exec && aberta(a)) {
+    if (a.status === 'em_andamento') ops.push({ k: 'concluir', rotulo: 'Concluir', Ic: LuCheck, fn: () => ac.concluir(a) }, { k: 'pausar', rotulo: 'Pausar', Ic: LuPause, fn: () => ac.pausar(a) });
+    else ops.push({ k: 'iniciar', rotulo: a.status === 'pausada' ? 'Retomar' : 'Iniciar', Ic: LuPlay, fn: () => ac.iniciar(a) }, { k: 'concluir', rotulo: 'Concluir', Ic: LuCheck, fn: () => ac.concluir(a) });
+  }
+  const envia = aberta(a) && a.status !== 'aguardando_aceite' && (gestor || a.responsavel_id === eu.id);
+  const destinos = envia ? destinosPermitidos(eu, dados, a.setor_id).filter(d => d.modo !== 'proprio') : [];
+  return { ops, distribuir, destinos };
+}
+
 /* ===================== cartão ===================== */
 export function Cartao({ a, arrastavel = false, acoes = true, mostrarSetor = false, mostrarResp = true }: { a: Atividade; arrastavel?: boolean; acoes?: boolean; mostrarSetor?: boolean; mostrarResp?: boolean }) {
   const { dados, abrirAtividade } = useDados();
   const s = dados.setores.find(x => x.id === a.setor_id);
   const r = dados.perfis.find(x => x.id === a.responsavel_id);
-  const o = a.origem_id ? dados.atividades.find(x => x.id === a.origem_id) : null;
   const f = a.fluxo_id ? dados.fluxos.find(x => x.id === a.fluxo_id) : null;
   const etapa = f && a.etapa_id ? f.definicao.nos.find(n => n.id === a.etapa_id) : null;
-  const prox = f && a.etapa_id ? proximosNos(f, a.etapa_id) : a.encaminhar_para ? [{ id: 'x', setor_id: a.encaminhar_para, titulo: '' }] : [];
-  const late = atrasada(a), hj = venceHoje(a);
+  const nos = nosDaAtividade(a, dados, abrirAtividade);
   const aus = r ? ausenciaAtiva(dados.ausencias, r.id) : null;
   return (
     <div className="cartao" style={{ ['--c' as string]: s?.cor }} draggable={arrastavel || undefined} data-atividade={a.id}
@@ -68,40 +102,58 @@ export function Cartao({ a, arrastavel = false, acoes = true, mostrarSetor = fal
       onClick={() => abrirAtividade(a.id)}>
       <div className="topo"><span className="numero">#{a.numero}</span><PillStatus s={a.status} /><span className="sp" /><Pri p={a.prioridade} /></div>
       <div className="titulo">{a.titulo}</div>
-      {(mostrarSetor || etapa) && <div className="meta">{mostrarSetor && <><PontoSetor s={s} />{s?.nome}</>}{etapa && <span className="ellipsis">{mostrarSetor ? '· ' : ''}Etapa: {etapa.titulo}</span>}</div>}
-      {(o || prox.length > 0 || f) && <div className="rota">
-        {f && <span className="fx" title={`Fluxo: ${f.nome}`}><LuWorkflow size={11} />{f.nome}</span>}
-        {o && o.setor_id !== a.setor_id && <span className="de" title="Veio de">↩ {dados.setores.find(x => x.id === o.setor_id)?.nome}</span>}
-        {prox.map(n => <span key={n.id} title="Próxima etapa">→ {dados.setores.find(x => x.id === n.setor_id)?.nome}</span>)}
-      </div>}
+      {(nos.length > 1 || mostrarSetor) && <div className="meta"><Elo nos={nos} /></div>}
+      {etapa && <div className="meta ellipsis" title={f?.nome}><LuWorkflow size={12} />{etapa.titulo}</div>}
       <div className="meta">
         {mostrarResp && (r ? <><Avatar p={r} setores={dados.setores} tam="p" /><span>{primeiroNome(r.nome)}</span>{aus && <span className="pill t-purple">ausente</span>}</> : <span>Sem responsável</span>)}
-        <span className={`prazo ${late ? 'atraso' : hj ? 'hoje' : ''}`}><LuCalendar size={12} />{late ? 'Atrasada · ' : hj ? 'Hoje · ' : ''}{fmtDataCurta(a.prazo)}</span>
+        <Prazo a={a} />
       </div>
       {acoes && <AcoesRapidas a={a} />}
     </div>
   );
 }
 
-function AcoesRapidas({ a }: { a: Atividade }) {
-  const { dados, eu } = useDados();
+export function Prazo({ a }: { a: Atividade }) {
+  if (!a.prazo) return <span className="prazo">sem prazo</span>;
+  const late = atrasada(a), hj = venceHoje(a);
+  return <span className={`prazo ${late ? 'atraso' : hj ? 'hoje' : ''}`} title={`Prazo: ${fmtData(a.prazo)}`}><LuCalendar size={12} />{late ? 'Atrasada · ' : hj ? 'Hoje' : ''}{hj ? '' : fmtDataCurta(a.prazo)}</span>;
+}
+
+/** Linha compacta para as filas do dia a dia. */
+export function LinhaAtividade({ a, mostrarResp = false, acoes = true }: { a: Atividade; mostrarResp?: boolean; acoes?: boolean }) {
+  const { dados, abrirAtividade } = useDados();
+  const s = dados.setores.find(x => x.id === a.setor_id);
+  const r = dados.perfis.find(x => x.id === a.responsavel_id);
+  const nos = nosDaAtividade(a, dados, abrirAtividade);
+  return <div className="linha-at" style={{ ['--c' as string]: s?.cor }} onClick={() => abrirAtividade(a.id)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && abrirAtividade(a.id)}>
+    <span className="cor" />
+    <div className="corpo">
+      <div className="l1"><span className="numero">#{a.numero}</span><span className="t" title={a.titulo}>{a.titulo}</span><Pri p={a.prioridade} /></div>
+      <div className="l2">{a.status !== 'em_andamento' && a.status !== 'na_fila' && <PillStatus s={a.status} />}<Elo nos={nos} />{mostrarResp && <span className="row" style={{ gap: 5 }}><Avatar p={r} setores={dados.setores} tam="p" />{r ? primeiroNome(r.nome) : 'sem responsável'}</span>}<Prazo a={a} /></div>
+    </div>
+    {acoes && <div className="fim" onClick={e => e.stopPropagation()}><AcoesRapidas a={a} compacto /></div>}
+  </div>;
+}
+
+function AcoesRapidas({ a, compacto = false }: { a: Atividade; compacto?: boolean }) {
+  const { dados, eu, abrirAtividade } = useDados();
   const ac = useAcoes();
-  const b: ReactNode[] = [];
+  const { ops, distribuir, destinos } = opcoesDe(a, eu, dados, ac);
   const pare = (fn: () => void) => (e: { stopPropagation(): void }) => { e.stopPropagation(); fn(); };
-  const gestor = gere(eu, a.setor_id, dados.setores);
-  if (a.status === 'aguardando_aceite') {
-    if (gestor) b.push(<button key="ac" className="btn p pri" onClick={pare(() => ac.aceitar(a))}><LuCheck size={14} />Aceitar</button>,
-      <button key="rc" className="btn p" onClick={pare(() => ac.recusar(a))}>Recusar</button>);
-  } else if (a.status === 'a_distribuir') {
-    if (gestor) b.push(<span key="d" onClick={e => e.stopPropagation()}><MenuDistribuir a={a} /></span>);
-    if (eu.setor_id === a.setor_id) b.push(<button key="pg" className="btn p" onClick={pare(() => ac.iniciar(a))}><LuPlay size={13} />Assumir e iniciar</button>);
-  } else if (podeExecutar(eu, a, dados.setores)) {
-    if (a.status === 'na_fila' || a.status === 'pausada') b.push(<button key="i" className="btn p" onClick={pare(() => ac.iniciar(a))}><LuPlay size={13} />{a.status === 'pausada' ? 'Retomar' : 'Iniciar'}</button>);
-    if (a.status === 'em_andamento') b.push(<button key="p" className="btn p" onClick={pare(() => ac.pausar(a))}><LuPause size={13} />Pausar</button>);
-    if (aberta(a)) b.push(<button key="c" className={`btn p ${a.status === 'em_andamento' ? 'pri' : ''}`} onClick={pare(() => ac.concluir(a))}><LuCheck size={14} />Concluir</button>);
-  }
-  if (aberta(a) && a.status !== 'aguardando_aceite' && (gestor || a.responsavel_id === eu.id)) b.push(<span key="env" onClick={e => e.stopPropagation()}><MenuEnviar a={a} /></span>);
-  return b.length ? <div className="acoes">{b}</div> : null;
+  const prim: Op | undefined = distribuir ? undefined : ops[0];
+  const resto: Op[] = distribuir ? ops : ops.slice(1);
+  if (!prim && !distribuir && !resto.length && !destinos.length) return null;
+  const principal = distribuir ? <span onClick={e => e.stopPropagation()}><MenuDistribuir a={a} /></span>
+    : prim && <button className={`btn p ${['aceitar', 'concluir'].includes(prim.k) || compacto ? 'pri' : ''}`} onClick={pare(prim.fn)}><prim.Ic size={14} />{prim.rotulo}</button>;
+  const menu = (resto.length > 0 || destinos.length > 0) && <span onClick={e => e.stopPropagation()}><Suspenso gatilho={(abrir, aberto) => <button className={`btn p fant icone ${aberto ? 'on' : ''}`} title="Mais ações" aria-label="Mais ações" onClick={abrir}><LuEllipsis size={16} /></button>}>
+    {fechar => <>
+      {resto.map(o => <button key={o.k} className={`mi ${o.perigo ? 'perigo' : ''}`} onClick={() => { fechar(); o.fn(); }}><o.Ic size={15} />{o.rotulo}</button>)}
+      {destinos.length > 0 && <>{resto.length > 0 && <hr />}<div className="rot-menu">Enviar para outro setor</div>
+        {destinos.map(d => <button key={d.setor.id} className="mi" onClick={() => { fechar(); ac.solicitar(a, d.setor.id); }}><PontoSetor s={d.setor} /><span className="grow">{d.setor.nome}</span><span className="xs muted">{d.modo === 'aceite' ? 'com aceite' : 'direto'}</span></button>)}</>}
+      <hr /><button className="mi" onClick={() => { fechar(); abrirAtividade(a.id); }}><LuFileText size={15} />Abrir detalhes</button>
+    </>}
+  </Suspenso></span>;
+  return compacto ? <>{principal}{menu}</> : <div className="acoes">{principal}<span className="sp" />{menu}</div>;
 }
 
 /** Envia (vincula) a atividade para outro setor com vínculo a partir do setor dela. */
@@ -110,9 +162,9 @@ export function MenuEnviar({ a }: { a: Atividade }) {
   const ac = useAcoes();
   const destinos = destinosPermitidos(eu, dados, a.setor_id).filter(d => d.modo !== 'proprio');
   if (!destinos.length) return null;
-  return <Suspenso alinhar="esq" gatilho={abrir => <button className="btn p" title="Enviar para outro setor" onClick={abrir}><LuSend size={13} />Enviar</button>}>
+  return <Suspenso alinhar="esq" gatilho={abrir => <button className="btn" title="Enviar para outro setor" onClick={abrir}><LuSend size={14} />Enviar para setor</button>}>
     {fechar => <>
-      <div className="xs muted" style={{ padding: '4px 10px' }}>Enviar para o setor</div>
+      <div className="rot-menu">Enviar para o setor</div>
       {destinos.map(d => <button key={d.setor.id} className="mi" onClick={() => { fechar(); ac.solicitar(a, d.setor.id); }}>
         <PontoSetor s={d.setor} /><span className="grow">{d.setor.nome}</span><span className="xs muted">{d.modo === 'aceite' ? 'com aceite' : 'direto'}</span></button>)}
     </>}
@@ -125,7 +177,7 @@ export function MenuDistribuir({ a, rotulo = 'Distribuir' }: { a: Atividade; rot
   const membros = dados.perfis.filter(p => p.setor_id === a.setor_id && p.ativo);
   return <Suspenso alinhar="esq" gatilho={abrir => <button className="btn p pri" onClick={abrir}><LuUser size={13} />{rotulo}</button>}>
     {fechar => <>
-      <div className="xs muted" style={{ padding: '4px 10px' }}>Atribuir a</div>
+      <div className="rot-menu">Atribuir a</div>
       {membros.map(p => {
         const aus = ausenciaAtiva(dados.ausencias, p.id);
         const carga = dados.atividades.filter(x => x.responsavel_id === p.id && aberta(x)).length;
@@ -180,7 +232,6 @@ export function DetalheAtividade() {
   if (!atividadeAberta) return null;
   if (!a) return <><div className="gaveta-veu" onClick={() => abrirAtividade(null)} /><aside className="gaveta"><div className="gaveta-h"><h2 className="grow">Atividade não encontrada</h2><button className="btn fant icone" onClick={() => abrirAtividade(null)}><LuX size={18} /></button></div><div className="gaveta-b" style={{ padding: 20 }}><Vazio>Ela pode ter sido excluída ou você não tem acesso.</Vazio></div></aside></>;
 
-  const s = dados.setores.find(x => x.id === a.setor_id);
   const pessoa = (id?: string | null) => dados.perfis.find(p => p.id === id);
   const f = a.fluxo_id ? dados.fluxos.find(x => x.id === a.fluxo_id) : null;
   const etapa = f && a.etapa_id ? f.definicao.nos.find(n => n.id === a.etapa_id) : null;
@@ -205,7 +256,7 @@ export function DetalheAtividade() {
         <div className="grow col" style={{ gap: 6 }}>
           <div className="row wrap"><span className="numero muted num">#{a.numero}</span><PillStatus s={a.status} /><Pri p={a.prioridade} />{atrasada(a) && <span className="pill t-red">Atrasada</span>}</div>
           <h2 style={{ fontSize: 19 }}>{a.titulo}</h2>
-          <div className="row sm muted wrap"><PontoSetor s={s} />{s?.nome}{etapa && <> · Etapa “{etapa.titulo}”</>}{f && <> · <LuWorkflow size={13} />{f.nome}</>}</div>
+          <div className="row wrap" style={{ gap: 10 }}><Elo nos={nosDaAtividade(a, dados, abrirAtividade)} />{f && <span className="sm muted row" style={{ gap: 5 }}><LuWorkflow size={13} />{f.nome}{etapa && <> · {etapa.titulo}</>}</span>}</div>
         </div>
         <button className="btn fant icone" onClick={() => abrirAtividade(null)} aria-label="Fechar"><LuX size={18} /></button>
       </div>
@@ -217,10 +268,7 @@ export function DetalheAtividade() {
       </div>
       <div className="gaveta-b">
         {aba === 'resumo' && <div className="col" style={{ padding: 20, gap: 18 }}>
-          {a.status === 'aguardando_aceite' && <Aviso tipo="atencao">Enviada por <b>{pessoa(a.criado_por)?.nome}</b>{a.solicitante_setor_id && <> ({dados.setores.find(x => x.id === a.solicitante_setor_id)?.nome})</>}. {gestor ? 'Aceite para colocar na fila do setor ou recuse explicando o motivo.' : `Aguardando o aceite de ${pessoa(s?.gestor_id)?.nome || 'gestor do setor'}.`}</Aviso>}
-          {a.status === 'recusada' && a.motivo && <Aviso tipo="erro"><b>Recusada:</b> {a.motivo}</Aviso>}
-          {a.status === 'pausada' && a.motivo && <Aviso tipo="info"><b>Pausada:</b> {a.motivo}</Aviso>}
-          {a.status === 'cancelada' && a.motivo && <Aviso tipo="erro"><b>Cancelada:</b> {a.motivo}</Aviso>}
+          <ProximoPasso a={a} />
           {a.responsavel_original_id && <Aviso tipo="info">Delegada temporariamente — responsável original: <b>{pessoa(a.responsavel_original_id)?.nome}</b>.</Aviso>}
           <div className="col"><span className="secao-titulo">Descrição</span>
             <div style={{ whiteSpace: 'pre-wrap', color: a.descricao ? 'var(--text)' : 'var(--muted)' }}>{a.descricao || 'Sem descrição.'}</div></div>
@@ -288,6 +336,35 @@ export function DetalheAtividade() {
       </div>
     </aside>
   </>;
+}
+
+/** Diz em uma frase o que precisa acontecer agora, com a ação certa ao lado. */
+function ProximoPasso({ a }: { a: Atividade }) {
+  const { dados, eu, svc } = useDados();
+  const ac = useAcoes();
+  const { ops, distribuir } = opcoesDe(a, eu, dados, ac);
+  const pessoa = (id?: string | null) => dados.perfis.find(p => p.id === id);
+  const s = dados.setores.find(x => x.id === a.setor_id);
+  const gestor = gere(eu, a.setor_id, dados.setores);
+  const prox = aberta(a) ? svc.preverProximos(a) : [];
+  const destino = prox.map(p => p.setor?.nome).filter(Boolean).join(' e ');
+  const minha = a.responsavel_id === eu.id;
+  let titulo = '', texto = '';
+  switch (a.status) {
+    case 'aguardando_aceite': titulo = gestor ? 'Decida se o seu setor aceita' : 'Aguardando aceite'; texto = gestor ? 'Aceite para colocar na fila (e já escolher quem faz) ou recuse explicando o motivo.' : `${pessoa(s?.gestor_id)?.nome || 'O gestor de ' + (s?.nome || 'destino')} precisa aceitar a solicitação.`; break;
+    case 'a_distribuir': titulo = gestor ? 'Escolha quem vai fazer' : 'Ainda sem responsável'; texto = gestor ? `Distribua para alguém de ${s?.nome}.` : eu.setor_id === a.setor_id ? 'Você pode assumir e começar agora.' : `O gestor de ${s?.nome} vai distribuir.`; break;
+    case 'na_fila': titulo = minha ? 'Na sua fila' : `Na fila de ${primeiroNome(pessoa(a.responsavel_id)?.nome)}`; texto = minha ? 'Inicie quando começar a trabalhar nela.' : 'Ainda não foi iniciada.'; break;
+    case 'em_andamento': titulo = minha ? 'Você está fazendo' : `Em andamento com ${primeiroNome(pessoa(a.responsavel_id)?.nome)}`; texto = destino ? `Ao concluir, segue para ${destino}.` : 'Conclua quando terminar.'; break;
+    case 'pausada': titulo = 'Pausada'; texto = a.motivo ? `Motivo: ${a.motivo}` : 'Retome quando puder continuar.'; break;
+    case 'concluida': titulo = 'Concluída'; texto = a.concluido_em ? `Em ${fmtDataHora(a.concluido_em)}.` : ''; break;
+    case 'recusada': titulo = 'Recusada'; texto = a.motivo || ''; break;
+    case 'cancelada': titulo = 'Cancelada'; texto = a.motivo || ''; break;
+  }
+  const p = ops[0];
+  return <div className="proximo-passo" style={{ borderColor: a.status === 'aguardando_aceite' ? 'color-mix(in srgb, var(--amber) 40%, var(--border))' : undefined }}>
+    <div className="txt"><b>{titulo}</b>{texto && <span>{texto}</span>}</div>
+    {distribuir ? <MenuDistribuir a={a} /> : p && <button className={`btn ${p.perigo ? '' : 'pri'}`} onClick={p.fn}><p.Ic size={15} />{p.rotulo}</button>}
+  </div>;
 }
 
 /* ===================== modais ===================== */
@@ -416,6 +493,8 @@ export function ModalNovaAtividade() {
   }} />;
 }
 
+const PRAZOS_RAPIDOS: [string, number][] = [['Hoje', 0], ['Amanhã', 1], ['Em 3 dias', 3], ['Em 1 semana', 7]];
+
 function FormNova({ inicial, dados, eu, onFechar, enviar }: { inicial: Partial<NovaAtividade>; dados: Dados; eu: Perfil; onFechar: () => void; enviar: (e: NovaAtividade) => Promise<string | null> }) {
   const { toast } = useApp();
   const destinos = useMemo(() => destinosPermitidos(eu, dados), [eu, dados]);
@@ -432,6 +511,7 @@ function FormNova({ inicial, dados, eu, onFechar, enviar }: { inicial: Partial<N
   });
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [salvando, setSalvando] = useState(false);
+  const [mais, setMais] = useState(false);
   const arqRef = useRef<HTMLInputElement>(null);
   const set = (p: Partial<typeof v>) => setV(x => ({ ...x, ...p }));
   const trocarModo = (m: NovaAtividade['modo']) => {
@@ -439,21 +519,33 @@ function FormNova({ inicial, dados, eu, onFechar, enviar }: { inicial: Partial<N
     if (m === 'setor') set({ setor_id: eu.setor_id && proprios.some(p => p.setor.id === eu.setor_id) ? eu.setor_id : proprios[0]?.setor.id || '', responsavel_id: '' });
     if (m === 'solicitar') set({ setor_id: externos[0]?.setor.id || '', responsavel_id: '' });
   };
-  const setorExec = dados.setores.find(s => s.id === v.setor_id);
+  const setor = (id?: string | null) => dados.setores.find(s => s.id === id) || null;
+  const setorExec = setor(v.setor_id);
   const destinoSel = destinos.find(d => d.setor.id === v.setor_id);
   const fluxo = dados.fluxos.find(f => f.id === v.fluxo_id);
   const etapas = fluxo ? etapasEmOrdem(fluxo) : [];
   const saidas = destinosPermitidos(eu, dados, v.setor_id || null).filter(d => d.modo !== 'proprio');
   const gestorExec = dados.perfis.find(p => p.id === setorExec?.gestor_id);
+  const meuSetor = setor(eu.setor_id);
 
   let resumo: ReactNode = null;
-  if (modo === 'fluxo' && fluxo) resumo = <>O processo <b>{fluxo.nome}</b> começa em {etapas.length ? <b>{dados.setores.find(s => s.id === etapas[0].setor_id)?.nome}</b> : '—'} e passa por {etapas.length} etapa(s). Cada setor recebe a atividade automaticamente quando a etapa anterior for concluída{etapas.some(e => e.requer_aceite !== false) ? ', com aceite do gestor quando configurado' : ''}.</>;
-  else if (modo === 'solicitar' && destinoSel) resumo = destinoSel.modo === 'aceite'
-    ? <>A solicitação vai para o <b>aceite de {gestorExec?.nome || 'gestor'}</b> ({setorExec?.nome}). Você será avisado quando for aceita ou recusada.</>
-    : <>A solicitação entra direto em <b>{setorExec?.nome}</b> para distribuição pelo gestor.</>;
-  else if (modo === 'setor') resumo = v.responsavel_id ? <>A atividade vai para a fila de <b>{dados.perfis.find(p => p.id === v.responsavel_id)?.nome}</b>.</> : <>A atividade fica <b>a distribuir</b> no painel de {setorExec?.nome} até o gestor atribuir.</>;
+  let caminho: NoElo[] = [];
+  if (modo === 'fluxo' && fluxo) {
+    resumo = <>Começa em <b>{setor(etapas[0]?.setor_id)?.nome || '—'}</b> e passa por {etapas.length} etapa(s). Cada setor recebe a atividade quando a etapa anterior for concluída{etapas.some(e => e.requer_aceite !== false) ? ', com aceite do gestor quando configurado' : ''}.</>;
+    caminho = etapas.map((e, i) => ({ setor: setor(e.setor_id), atual: i === 0, previsto: i > 0, titulo: e.titulo }));
+  } else if (modo === 'solicitar' && destinoSel) {
+    resumo = destinoSel.modo === 'aceite' ? <>Vai para o <b>aceite de {gestorExec?.nome || 'gestor'}</b> em {setorExec?.nome}. Você é avisado quando for aceita ou recusada.</> : <>Entra direto em <b>{setorExec?.nome}</b> para o gestor distribuir.</>;
+    caminho = [{ setor: meuSetor, rotulo: meuSetor ? `${meuSetor.nome} (você)` : 'Você' }, { setor: setorExec, atual: true }];
+  } else if (modo === 'setor') {
+    resumo = v.responsavel_id ? <>Vai direto para a fila de <b>{dados.perfis.find(p => p.id === v.responsavel_id)?.nome}</b>.</> : <>Fica <b>a distribuir</b> no painel de {setorExec?.nome} até o gestor escolher quem faz.</>;
+    caminho = [{ setor: setorExec, atual: true }, ...(v.encaminhar_para ? [{ setor: setor(v.encaminhar_para), previsto: true }] : [])];
+  }
 
+  const podeResp = modo === 'setor' || (modo === 'fluxo' && etapas[0] && (etapas[0].setor_id === eu.setor_id || gere(eu, etapas[0].setor_id, dados.setores)));
+  const setorResp = modo === 'fluxo' ? etapas[0]?.setor_id || '' : v.setor_id;
+  const invalido = v.titulo.trim().length < 3 || (modo !== 'fluxo' && !v.setor_id) || (modo === 'fluxo' && !fluxo);
   const submeter = async () => {
+    if (invalido || salvando) return;
     setSalvando(true);
     const t = await enviar({ modo, titulo: v.titulo, descricao: v.descricao, prioridade: v.prioridade, inicio: v.inicio, prazo: v.prazo,
       setor_id: modo === 'fluxo' ? null : v.setor_id, responsavel_id: v.responsavel_id || null, fluxo_id: modo === 'fluxo' ? v.fluxo_id : null,
@@ -461,45 +553,60 @@ function FormNova({ inicial, dados, eu, onFechar, enviar }: { inicial: Partial<N
     setSalvando(false);
     if (t) toast(t);
   };
-  const podeResp = modo === 'setor' || (modo === 'fluxo' && etapas[0] && (etapas[0].setor_id === eu.setor_id || gere(eu, etapas[0].setor_id, dados.setores)));
-  const setorResp = modo === 'fluxo' ? etapas[0]?.setor_id || '' : v.setor_id;
-  const invalido = v.titulo.trim().length < 3 || (modo !== 'fluxo' && !v.setor_id) || (modo === 'fluxo' && !fluxo);
+  const detalhes = [v.inicio !== hoje() && 'início', v.responsavel_id && 'responsável', v.encaminhar_para && 'encaminhamento', arquivos.length && `${arquivos.length} anexo(s)`].filter(Boolean) as string[];
+  const tipos: [NovaAtividade['modo'], string, string, typeof LuInbox, boolean][] = [
+    ['setor', 'Para o meu setor', 'Entra na fila do setor', LuInbox, proprios.length > 0],
+    ['solicitar', 'Para outro setor', externos.length ? 'O gestor de lá recebe' : 'Seu setor não tem vínculos', LuSend, externos.length > 0],
+    ['fluxo', 'Iniciar um processo', fluxos.length ? 'Passa por vários setores' : 'Nenhum fluxo publicado', LuWorkflow, fluxos.length > 0],
+  ];
 
-  return <Modal titulo="Nova solicitação" sub="Escolha como a demanda vai entrar no fluxo de trabalho" onFechar={onFechar} tam="largo"
-    rodape={<><button className="btn" onClick={onFechar}>Cancelar</button><button className="btn pri" disabled={invalido || salvando} onClick={submeter}>{salvando ? 'Enviando…' : modo === 'solicitar' ? <><LuSend size={14} />Enviar solicitação</> : modo === 'fluxo' ? <><LuWorkflow size={15} />Iniciar processo</> : <><LuCheck size={15} />Criar atividade</>}</button></>}>
-    <div className="opcoes">
-      <button className={`opcao ${modo === 'setor' ? 'on' : ''}`} disabled={!proprios.length} style={!proprios.length ? { opacity: .5 } : undefined} onClick={() => trocarModo('setor')}><span className="ic"><LuInbox size={17} /></span><b>Atividade do meu setor</b><span>Entra na fila do seu setor para distribuição.</span></button>
-      <button className={`opcao ${modo === 'solicitar' ? 'on' : ''}`} disabled={!externos.length} style={!externos.length ? { opacity: .5 } : undefined} onClick={() => trocarModo('solicitar')}><span className="ic"><LuBuilding2 size={17} /></span><b>Solicitar a outro setor</b><span>{externos.length ? 'Enviada ao gestor do setor vinculado.' : 'Seu setor ainda não tem vínculos.'}</span></button>
-      <button className={`opcao ${modo === 'fluxo' ? 'on' : ''}`} disabled={!fluxos.length} style={!fluxos.length ? { opacity: .5 } : undefined} onClick={() => trocarModo('fluxo')}><span className="ic"><LuWorkflow size={17} /></span><b>Iniciar um processo</b><span>{fluxos.length ? 'Segue um fluxo desenhado entre setores.' : 'Nenhum fluxo publicado.'}</span></button>
+  return <Modal titulo="Nova solicitação" onFechar={onFechar} tam="largo"
+    rodape={<><span className="xs muted desk-only" style={{ marginRight: 'auto' }}><Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> para enviar</span>
+      <button className="btn" onClick={onFechar}>Cancelar</button><button className="btn pri" disabled={invalido || salvando} onClick={submeter}>{salvando ? 'Enviando…' : modo === 'solicitar' ? <><LuSend size={14} />Enviar solicitação</> : modo === 'fluxo' ? <><LuWorkflow size={15} />Iniciar processo</> : <><LuCheck size={15} />Criar atividade</>}</button></>}>
+    <div onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submeter(); } }} className="col" style={{ gap: 18 }}>
+      <div className="campo"><label>Para onde vai?</label>
+        <div className="escolha tipos">{tipos.map(([m, t, d, I, ok]) => <button key={m} type="button" className={modo === m ? 'on' : ''} disabled={!ok} onClick={() => trocarModo(m)}><b><I size={16} />{t}</b><span>{d}</span></button>)}</div></div>
+
+      {modo === 'solicitar' && <div className="campo"><label>Qual setor?</label>
+        <div className="escolha destinos">{externos.map(d => <button key={d.setor.id} type="button" className={v.setor_id === d.setor.id ? 'on' : ''} style={{ ['--c' as string]: d.setor.cor }} onClick={() => set({ setor_id: d.setor.id, responsavel_id: '' })}>{d.setor.nome}<span className="xs">{d.modo === 'aceite' ? 'com aceite' : 'direto'}</span></button>)}</div></div>}
+      {modo === 'setor' && proprios.length > 1 && <div className="campo"><label>Setor</label>
+        <div className="escolha destinos">{proprios.map(d => <button key={d.setor.id} type="button" className={v.setor_id === d.setor.id ? 'on' : ''} style={{ ['--c' as string]: d.setor.cor }} onClick={() => set({ setor_id: d.setor.id, responsavel_id: '', encaminhar_para: '' })}>{d.setor.nome}</button>)}</div></div>}
+      {modo === 'fluxo' && <Campo rotulo="Qual processo?"><select className="inp" value={v.fluxo_id} onChange={e => set({ fluxo_id: e.target.value })}>{fluxos.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></Campo>}
+
+      <Campo rotulo={modo === 'fluxo' ? 'Nome desta execução' : 'O que precisa ser feito?'}><input className="inp titulo-grande" autoFocus value={v.titulo} onChange={e => set({ titulo: e.target.value })} placeholder={modo === 'fluxo' ? `Ex.: ${fluxo?.nome || 'Processo'} – Cliente X` : 'Ex.: Apuração de ICMS de outubro'} /></Campo>
+      <Campo rotulo="Detalhes" ajuda="Informações, documentos necessários e como saber que está pronto."><textarea className="inp" rows={3} value={v.descricao} onChange={e => set({ descricao: e.target.value })} /></Campo>
+
+      <div className="grade">
+        <div className="campo"><label>Prazo{modo === 'fluxo' && <span className="muted" style={{ fontWeight: 400 }}> · etapas com prazo próprio usam o do fluxo</span>}</label>
+          <div className="escolha">{PRAZOS_RAPIDOS.map(([r, d]) => <button key={r} type="button" className={v.prazo === addDias(d) ? 'on' : ''} onClick={() => set({ prazo: addDias(d) })}>{r}</button>)}
+            <input type="date" className="inp data-livre" aria-label="Escolher data do prazo" value={v.prazo} onChange={e => set({ prazo: e.target.value })} /></div></div>
+        <div className="campo"><label>Prioridade</label>
+          <div className="escolha prioridades">{(Object.keys(PRIORIDADE) as Prioridade[]).map(k => <button key={k} type="button" data-p={k} className={v.prioridade === k ? 'on' : ''} onClick={() => set({ prioridade: k })}>{PRIORIDADE[k].rotulo}</button>)}</div></div>
+      </div>
+
+      <div className="col" style={{ gap: 12 }}>
+        <button type="button" className={`recolher ${mais ? 'aberto' : ''}`} onClick={() => setMais(!mais)}><LuChevronRight size={15} />Mais opções{!mais && detalhes.length > 0 && <span className="muted" style={{ fontWeight: 400 }}>· {detalhes.join(', ')}</span>}<span className="muted" style={{ fontWeight: 400 }}>{!mais && !detalhes.length && '· início, responsável, encaminhamento e anexos'}</span></button>
+        {mais && <>
+          <div className="grade g3">
+            <Campo rotulo="Início"><input type="date" className="inp" value={v.inicio} onChange={e => set({ inicio: e.target.value })} /></Campo>
+            {podeResp && setorResp ? (gere(eu, setorResp, dados.setores)
+              ? <Campo rotulo="Responsável"><SelecaoPessoa setorId={setorResp} valor={v.responsavel_id} onChange={x => set({ responsavel_id: x })} vazio="O gestor distribui depois" /></Campo>
+              : <Campo rotulo="Responsável"><select className="inp" value={v.responsavel_id} onChange={e => set({ responsavel_id: e.target.value })}><option value="">O gestor distribui</option><option value={eu.id}>Eu mesmo</option></select></Campo>) : <span />}
+            {modo === 'setor' && <Campo rotulo="Ao concluir, enviar para" ajuda={saidas.length ? undefined : 'Este setor não tem vínculos de saída.'}><select className="inp" value={v.encaminhar_para} onChange={e => set({ encaminhar_para: e.target.value })}>
+              <option value="">Ninguém (termina aqui)</option>{saidas.map(d => <option key={d.setor.id} value={d.setor.id}>{d.setor.nome} — {d.modo === 'aceite' ? 'com aceite' : 'direto'}</option>)}</select></Campo>}
+          </div>
+          <div className="drop" onClick={() => arqRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); setArquivos(x => [...x, ...(Array.from(e.dataTransfer.files) as File[])]); }}>
+            <LuPaperclip size={15} /> <b>Anexar arquivos</b> <span className="xs">clique ou arraste aqui</span></div>
+          <input ref={arqRef} type="file" multiple hidden onChange={e => { setArquivos(x => [...x, ...(Array.from(e.target.files || []) as File[])]); e.target.value = ''; }} />
+          {arquivos.length > 0 && <div className="row wrap">{arquivos.map((f, i) => <span key={i} className="chip"><LuPaperclip size={12} />{f.name} <span className="muted xs">{tamanhoArquivo(f.size)}</span><button className="btn fant icone p" aria-label={`Remover ${f.name}`} onClick={() => setArquivos(x => x.filter((_, j) => j !== i))}><LuX size={12} /></button></span>)}</div>}
+        </>}
+      </div>
+
+      {resumo && <div className="proximo-passo" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 8 }}>
+        {caminho.length > 0 && <Elo nos={caminho} grande />}
+        <span className="sm" style={{ color: 'var(--text-2)' }}>{resumo}</span>
+      </div>}
     </div>
-    <div className="grade">
-      {modo === 'fluxo' ? <Campo rotulo="Fluxo de processo" classe="full"><select className="inp" value={v.fluxo_id} onChange={e => set({ fluxo_id: e.target.value })}>{fluxos.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></Campo>
-        : <Campo rotulo={modo === 'setor' ? 'Setor' : 'Para qual setor?'} classe="full"><select className="inp" value={v.setor_id} onChange={e => set({ setor_id: e.target.value, responsavel_id: '', encaminhar_para: '' })}>
-          {(modo === 'setor' ? proprios : externos).map(d => <option key={d.setor.id} value={d.setor.id}>{d.setor.nome}{modo === 'solicitar' ? (d.modo === 'aceite' ? ' — requer aceite' : ' — entrada direta') : ''}</option>)}</select></Campo>}
-      {modo === 'fluxo' && fluxo && <div className="full trilha">{etapas.map((e, i) => <span key={e.id} className="row" style={{ gap: 4 }}>{i > 0 && <span className="sep"><LuChevronRight size={14} /></span>}<span className="chip"><PontoSetor s={dados.setores.find(s => s.id === e.setor_id)} />{dados.setores.find(s => s.id === e.setor_id)?.nome}<span className="muted">· {e.titulo}{e.prazo_dias ? ` · ${e.prazo_dias}d` : ''}</span></span></span>)}</div>}
-      <Campo rotulo={modo === 'fluxo' ? 'Nome desta execução *' : 'Título *'} classe="full"><input className="inp" autoFocus value={v.titulo} onChange={e => set({ titulo: e.target.value })} placeholder={modo === 'fluxo' ? `Ex.: ${fluxo?.nome || 'Processo'} – Cliente X` : 'Ex.: Apuração de ICMS de outubro'} /></Campo>
-      <Campo rotulo="Descrição" classe="full"><textarea className="inp" value={v.descricao} onChange={e => set({ descricao: e.target.value })} placeholder="O que precisa ser feito, informações e critérios de aceite" /></Campo>
-    </div>
-    <div className="grade g3">
-      <Campo rotulo="Prioridade"><select className="inp" value={v.prioridade} onChange={e => set({ prioridade: e.target.value as Prioridade })}>{Object.entries(PRIORIDADE).map(([k, p]) => <option key={k} value={k}>{p.rotulo}</option>)}</select></Campo>
-      <Campo rotulo="Início"><input type="date" className="inp" value={v.inicio} onChange={e => set({ inicio: e.target.value })} /></Campo>
-      <Campo rotulo="Prazo" ajuda={modo === 'fluxo' ? 'Etapas com prazo próprio usam o definido no fluxo.' : undefined}><input type="date" className="inp" value={v.prazo} onChange={e => set({ prazo: e.target.value })} /></Campo>
-    </div>
-    <div className="grade">
-      {podeResp && setorResp && (gere(eu, setorResp, dados.setores)
-        ? <Campo rotulo="Responsável"><SelecaoPessoa setorId={setorResp} valor={v.responsavel_id} onChange={x => set({ responsavel_id: x })} vazio="— distribuir depois —" /></Campo>
-        : <Campo rotulo="Responsável"><select className="inp" value={v.responsavel_id} onChange={e => set({ responsavel_id: e.target.value })}><option value="">— gestor distribui —</option><option value={eu.id}>Eu mesmo ({eu.nome})</option></select></Campo>)}
-      {modo === 'setor' && <Campo rotulo="Encaminhar ao concluir para (opcional)" ajuda={saidas.length ? undefined : 'Este setor não tem vínculos de saída.'}><select className="inp" value={v.encaminhar_para} onChange={e => set({ encaminhar_para: e.target.value })}>
-        <option value="">Não encaminhar</option>{saidas.map(d => <option key={d.setor.id} value={d.setor.id}>{d.setor.nome} — {d.modo === 'aceite' ? 'requer aceite' : 'entrada direta'}</option>)}</select></Campo>}
-    </div>
-    <div className="col">
-      <span className="rotulo">Anexos</span>
-      <div className="drop" onClick={() => arqRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); setArquivos(x => [...x, ...(Array.from(e.dataTransfer.files) as File[])]); }}>
-        <LuPaperclip size={16} /> <b>Adicionar arquivos</b> <span className="xs">(clique ou arraste)</span></div>
-      <input ref={arqRef} type="file" multiple hidden onChange={e => { setArquivos(x => [...x, ...(Array.from(e.target.files || []) as File[])]); e.target.value = ''; }} />
-      {arquivos.length > 0 && <div className="row wrap">{arquivos.map((f, i) => <span key={i} className="chip"><LuPaperclip size={12} />{f.name} <span className="muted xs">{tamanhoArquivo(f.size)}</span><button className="btn fant icone p" onClick={() => setArquivos(x => x.filter((_, j) => j !== i))}><LuX size={12} /></button></span>)}</div>}
-    </div>
-    {resumo && <Aviso tipo={modo === 'solicitar' && destinoSel?.modo === 'aceite' ? 'atencao' : 'info'}><b>O que vai acontecer: </b>{resumo}</Aviso>}
   </Modal>;
 }
 

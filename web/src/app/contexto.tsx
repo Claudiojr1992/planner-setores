@@ -7,6 +7,7 @@ import { SupabaseRepo } from '../lib/repo/supabase';
 import { carregarDados } from '../lib/dados';
 import { Servico, type NovaAtividade } from '../lib/servico';
 import { config, usaSupabase } from './config';
+import { aplicarMarca } from './marca';
 
 export type Tema = 'claro' | 'escuro' | 'sistema';
 export interface Toast { id: number; texto: string; tipo: 'ok' | 'erro' | 'info' }
@@ -108,6 +109,9 @@ export function Provedor({ children }: { children: ReactNode }) {
   }, []);
   const temaEfetivo = tema === 'sistema' ? (sistemaEscuro ? 'escuro' : 'claro') : tema;
   useEffect(() => { document.documentElement.dataset.theme = temaEfetivo === 'escuro' ? 'dark' : 'light'; }, [temaEfetivo]);
+  // cor da marca da empresa (login e sistema)
+  const corMarca = (dados?.empresa || empresa)?.cor_primaria;
+  useEffect(() => { aplicarMarca(corMarca); }, [corMarca]);
   const definirTema = useCallback((t: Tema) => { setTema(t); try { localStorage.setItem(TEMA_KEY, t); } catch { /* */ } }, []);
 
   const confirmar = useCallback((p: PedidoConfirmacao) => new Promise<string | false>(resolver => setDialogo({ ...p, resolver })), []);

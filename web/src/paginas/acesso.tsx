@@ -1,26 +1,39 @@
 import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
-import { LuEye, LuEyeOff, LuLogIn, LuMail, LuArrowLeft, LuKeyRound, LuUserPlus, LuHourglass, LuRefreshCw, LuLogOut, LuCircleCheck, LuWorkflow } from 'react-icons/lu';
+import { LuEye, LuEyeOff, LuLogIn, LuMail, LuArrowLeft, LuKeyRound, LuUserPlus, LuHourglass, LuRefreshCw, LuLogOut, LuCircleCheck } from 'react-icons/lu';
 import { useApp } from '../app/contexto';
 import { navegar } from '../app/rota';
 import { NOME_SISTEMA } from '../app/config';
-import { Aviso, Campo } from '../ui/base';
+import { Aviso, Campo, Marca as MarcaLogo } from '../ui/base';
 import type { DemoRepo } from '../lib/repo/demo';
 
-function Marca() {
+function MarcaEmpresa() {
   const { empresa } = useApp();
-  return <div className="marca">{empresa?.logo_url ? <img src={empresa.logo_url} alt={empresa.nome} /> : <span className="logo-pad"><LuWorkflow size={18} /></span>}<span>{empresa?.nome || NOME_SISTEMA}</span></div>;
+  return <div className="marca"><MarcaLogo logo={empresa?.logo_url} nome={empresa?.nome} /><span>{empresa?.nome || NOME_SISTEMA}</span></div>;
 }
+const PASSAGEM: [string, string, string][] = [
+  ['Comercial pede', 'a solicitação sai com prazo e anexos', '#c03a7a'],
+  ['Fiscal aceita', 'o gestor decide e define quem faz', '#2f5bd3'],
+  ['A analista executa', 'inicia, pausa, conclui e comenta', '#2f5bd3'],
+  ['Financeiro recebe', 'a próxima etapa chega sozinha, com aviso', '#2b7a47'],
+];
 function Layout({ children }: { children: ReactNode }) {
   return <div className="auth">
     <div className="auth-arte">
-      <Marca />
-      <div className="demo-fluxo">{['Solicitação', 'Aceite do gestor', 'Distribuição', 'Execução', 'Próximo setor'].map((t, i) => <span key={t} className="row" style={{ gap: 0 }}>{i > 0 && <span className="s" />}<span className="n">{t}</span></span>)}</div>
-      <h2>Processos entre setores, do pedido à entrega.</h2>
-      <p>Planeje as atividades de cada setor e acompanhe as filas da equipe. As passagens entre áreas são feitas com aceite, prazos e notificações por e-mail e Teams.</p>
+      <MarcaEmpresa />
+      <div className="passagem" aria-hidden="true">{PASSAGEM.map(([t, d, c], i) => <div key={t}>
+        {i > 0 && <div className="fio" style={{ ['--i' as string]: i - 1, ['--c1' as string]: PASSAGEM[i - 1][2], ['--c2' as string]: c }} />}
+        <div className="etapa" style={{ ['--i' as string]: i, ['--c' as string]: c }}><span className="pt">{i + 1}</span><div><b>{t}</b><span>{d}</span></div></div>
+      </div>)}</div>
+      <h2>Cada pedido chega ao setor certo, com dono e prazo.</h2>
+      <p>Filas por pessoa, aceite entre setores e o caminho de cada atividade à vista, do pedido à entrega.</p>
     </div>
-    <div className="auth-form"><div className="auth-card">{children}</div></div>
+    <div className="auth-form"><div className="auth-card"><div className="marca-mobile"><MarcaEmpresaMobile /></div>{children}</div></div>
   </div>;
+}
+function MarcaEmpresaMobile() {
+  const { empresa } = useApp();
+  return <><MarcaLogo logo={empresa?.logo_url} nome={empresa?.nome} /><span>{empresa?.nome || NOME_SISTEMA}</span></>;
 }
 function CampoSenha({ valor, onChange, rotulo = 'Senha', auto = 'current-password' }: { valor: string; onChange: (v: string) => void; rotulo?: string; auto?: string }) {
   const [ver, setVer] = useState(false);

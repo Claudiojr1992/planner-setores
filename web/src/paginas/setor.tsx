@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { LuTreePalm, LuPlus, LuInbox, LuHourglass } from 'react-icons/lu';
+import { LuTreePalm, LuPlus, LuInbox, LuHourglass, LuChevronDown, LuChevronRight } from 'react-icons/lu';
 import { useDados } from '../app/contexto';
 import { navegar } from '../app/rota';
 import type { Atividade } from '../lib/types';
@@ -17,6 +17,8 @@ export function PainelSetor() {
   const s = dados.setores.find(x => x.id === sid);
   const ac = useAcoes();
   const [alvo, setAlvo] = useState<string | null>(null);
+  const [mapa, setMapa] = useState(() => { try { return localStorage.getItem('planner.setor.mapa') !== '0'; } catch { return true; } });
+  const alternarMapa = () => setMapa(m => { try { localStorage.setItem('planner.setor.mapa', m ? '0' : '1'); } catch { /* */ } return !m; });
   if (!s) return <Vazio>Você não gerencia nenhum setor.</Vazio>;
   const ats = dados.atividades.filter(a => a.setor_id === sid);
   const membros = dados.perfis.filter(p => p.setor_id === sid && p.ativo);
@@ -41,31 +43,32 @@ export function PainelSetor() {
       <div className="t"><div className="row"><PontoSetor s={s} /><h1>{s.nome}</h1></div><p>Gestor: {dados.perfis.find(p => p.id === s.gestor_id)?.nome || '—'} · {membros.length} pessoas{s.descricao ? ` · ${s.descricao}` : ''}</p></div>
       <div className="sp">
         {geridos.length > 1 && <select className="inp" style={{ width: 'auto' }} value={sid} onChange={e => setSel(e.target.value)}>{geridos.map(id => <option key={id} value={id}>{dados.setores.find(x => x.id === id)?.nome}</option>)}</select>}
-        <button className="btn" onClick={() => navegar('/ausencias')}><LuTreePalm size={15} />Programar férias</button>
-        <button className="btn pri" onClick={() => abrirNova({ modo: 'setor', setor_id: sid })}><LuPlus size={16} />Nova atividade</button>
+        <button className="btn" onClick={() => navegar('/ausencias')}><LuTreePalm size={15} />Programar ausência</button>
+        <button className="btn" onClick={() => abrirNova({ modo: 'setor', setor_id: sid })}><LuPlus size={16} />Atividade para {s.nome}</button>
       </div>
     </div>
     <Indicadores lista={ats} onFiltro={f => navegar(`/atividades?setor=${sid}&f=${f}`)} />
-    <Painel titulo="Mapa da equipe" sub="entradas de outros setores → equipe → saídas previstas" sem>
-      <div style={{ padding: 16 }}><MapaEquipe setorId={sid} ats={ats} /></div>
-    </Painel>
     <div className="duas iguais">
-      <Painel id="aguardando" titulo={<span className="row"><LuHourglass size={17} />Aguardando aceite</span>} sub={`${aguardando.length} solicitações de outros setores`}>
-        {aguardando.length ? <div className="lista-cartoes">{aguardando.map(a => <Cartao key={a.id} a={a} />)}</div> : <Vazio>Nenhuma solicitação aguardando aceite.</Vazio>}
+      <Painel id="aguardando" titulo={<span className="row"><LuHourglass size={17} />Aguardando aceite<span className="pill t-amber">{aguardando.length}</span></span>} sub="pedidos de outros setores para você decidir">
+        {aguardando.length ? <div className="lista-cartoes">{aguardando.map(a => <Cartao key={a.id} a={a} />)}</div> : <Vazio>Nenhum pedido esperando sua decisão.</Vazio>}
       </Painel>
-      <Painel titulo={<span className="row"><LuInbox size={17} />A distribuir</span>} sub="arraste para a fila de uma pessoa ou use “Distribuir”">
+      <Painel titulo={<span className="row"><LuInbox size={17} />A distribuir<span className="pill t-cyan">{distribuir.length}</span></span>} sub="escolha quem faz ou arraste para a fila da pessoa">
         <div className={`lista-cartoes ${alvo === 'sem' ? 'solta' : ''}`} style={{ minHeight: 80, borderRadius: 10 }} {...zona('sem', null)}>
-          {distribuir.length ? distribuir.map(a => <Cartao key={a.id} a={a} arrastavel />) : <Vazio>Tudo distribuído. Solte aqui para devolver uma atividade à distribuição.</Vazio>}</div>
+          {distribuir.length ? distribuir.map(a => <Cartao key={a.id} a={a} arrastavel />) : <Vazio>Tudo distribuído. Para devolver uma atividade à distribuição, solte-a aqui.</Vazio>}</div>
       </Painel>
     </div>
-    <Painel titulo="Filas por pessoa" sub="arraste os cartões entre as colunas para redistribuir">
+    <Painel titulo="Mapa da equipe" sub="o que entra de outros setores, quem está fazendo o quê e para onde segue" sem
+      acoes={<button className="btn p fant" onClick={alternarMapa}>{mapa ? <><LuChevronDown size={14} />Recolher</> : <><LuChevronRight size={14} />Mostrar</>}</button>}>
+      {mapa && <div style={{ padding: 16 }}><MapaEquipe setorId={sid} ats={ats} /></div>}
+    </Painel>
+    <Painel titulo="Filas por pessoa" sub="arraste um cartão para outra pessoa para redistribuir">
       <div className="kanban">{membros.map(p => {
         const its = ordenar(ats.filter(a => a.responsavel_id === p.id && aberta(a) && a.status !== 'aguardando_aceite'));
         const aus = ausenciaAtiva(dados.ausencias, p.id);
         const and = its.filter(a => a.status === 'em_andamento').length;
         return <div key={p.id} className={`coluna ${aus ? 'ausente' : ''}`}>
           <div className="coluna-h"><Avatar p={p} setores={dados.setores} tam="m" /><div className="grow" style={{ minWidth: 0 }}><div className="n ellipsis">{p.nome}{p.id === s.gestor_id && <span className="muted xs"> · gestor</span>}</div>
-            <div className="s">{aus ? <span style={{ color: 'var(--purple)', fontWeight: 600 }}>{TIPO_AUSENCIA[aus.tipo]} até {fmtData(aus.fim)}</span> : <>{and} em andamento · {its.length - and} na fila{its.some(atrasada) ? <b style={{ color: 'var(--red)' }}> · {its.filter(atrasada).length} atrasada(s)</b> : ''}</>}</div></div></div>
+            <div className="s">{aus ? <span style={{ color: 'var(--purple)', fontWeight: 600 }}>{TIPO_AUSENCIA[aus.tipo]} até {fmtData(aus.fim)}</span> : <>{and} em andamento · {its.length - and} na fila{its.some(atrasada) ? <b style={{ color: 'var(--red)' }}> · {its.filter(atrasada).length} atrasada(s)</b> : ''}</>}</div></div><span className="qt" title="Abertas com esta pessoa">{its.length}</span></div>
           <div className={`coluna-b ${alvo === p.id ? 'solta' : ''}`} {...zona(p.id, p.id)}>{its.length ? its.map(a => <Cartao key={a.id} a={a} arrastavel mostrarResp={false} />) : <div className="xs muted" style={{ textAlign: 'center', padding: 18 }}>Solte atividades aqui</div>}</div>
         </div>;
       })}</div>

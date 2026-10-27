@@ -4,7 +4,7 @@ Sistema de planejamento e gestão de atividades **por setor**, com passagem cont
 
 | | |
 |---|---|
-| **Interface** | React + TypeScript, menu lateral com barra superior, tema claro, escuro ou automático |
+| **Interface** | React + TypeScript, identidade visual "Elo" com cor e logotipo da empresa, tema claro, escuro ou automático, atalhos de teclado |
 | **Banco e login** | PostgreSQL com regras de acesso no banco (RLS), login GoTrue e API PostgREST (os mesmos componentes do Supabase); também roda no Supabase na nuvem |
 | **Notificações** | No sistema (sino), por e-mail (SMTP) e por Microsoft Teams (webhook por canal) |
 | **Execução** | **Na nuvem**: Vercel (interface e notificador) + Supabase (banco, login, arquivos). **Ou local**: tudo em Docker, com scripts de um clique para Windows |
@@ -88,3 +88,4 @@ docs/                documentação completa
 6. [Integrações: e-mail e Teams](docs/06-INTEGRACOES.md)
 7. [Desenvolvimento e testes](docs/07-DESENVOLVIMENTO.md)
 8. [Publicar na nuvem: GitHub + Vercel + Supabase](docs/08-PUBLICAR-NA-NUVEM.md)
+9. [Identidade visual e experiência](docs/09-IDENTIDADE-VISUAL.md)

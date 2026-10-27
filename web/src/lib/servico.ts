@@ -565,10 +565,11 @@ export class Servico {
     this.exigir(ehAdmin(this.eu) && p.id !== this.eu.id, 'Sem permissão.');
     await this.repo.remover('perfis', p.id);
   }
-  async salvarEmpresa(nome: string) {
+  async salvarEmpresa(nome: string, cor_primaria?: string | null) {
     this.exigir(ehAdmin(this.eu), 'Somente a diretoria altera os dados da empresa.');
     this.exigir(nome.trim().length >= 2, 'Informe o nome da empresa.');
-    await this.repo.atualizar('empresa', 1, { nome: nome.trim() });
+    if (cor_primaria !== undefined) this.exigir(cor_primaria === null || /^#[0-9a-f]{6}$/i.test(cor_primaria), 'Escolha uma cor válida (formato #RRGGBB).');
+    await this.repo.atualizar('empresa', 1, { nome: nome.trim(), ...(cor_primaria !== undefined ? { cor_primaria } : {}) });
   }
   async enviarLogo(arq: File) {
     this.exigir(ehAdmin(this.eu), 'Somente a diretoria altera o logo.');

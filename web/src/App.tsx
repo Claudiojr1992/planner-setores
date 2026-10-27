@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import { LuWorkflow } from 'react-icons/lu';
 import { Provedor, useApp } from './app/contexto';
 import { navegar, useRota } from './app/rota';
 import { ehAdmin, ehGestor } from './lib/regras';
-import { DialogoGlobal, Toasts } from './ui/base';
+import { DialogoGlobal, Simbolo, Toasts } from './ui/base';
 import { DetalheAtividade, ModaisAtividade, ModalNovaAtividade } from './ui/atividade';
 import { AguardandoAprovacao, Cadastro, EsqueciSenha, Login, RedefinirSenha } from './paginas/acesso';
 import { Estrutura, SemAcesso, TelaSair } from './paginas/estrutura';
@@ -27,7 +26,7 @@ function Roteador() {
   useEffect(() => { if (rota.partes[0] === 'atividade' && rota.partes[1] && dados) { abrirAtividade(rota.partes[1]); navegar('/', true); } }, [c, !!dados]); // eslint-disable-line
   useEffect(() => { if (!iniciando && sessao && PUBLICAS.includes(c)) navegar('/', true); }, [iniciando, sessao, c]);
 
-  if (iniciando) return <div className="carregando"><span className="logo-pad" style={{ width: 46, height: 46 }}><LuWorkflow size={22} /></span><div className="giro" /><span>Carregando…</span></div>;
+  if (iniciando) return <div className="carregando"><span className="logo-pad" style={{ width: 46, height: 46 }}><Simbolo tam={46} /></span><span>Carregando…</span></div>;
   if (c === '/redefinir-senha' || repo.auth.emRecuperacao()) return <RedefinirSenha />;
   if (!sessao) {
     if (c === '/cadastro') return <Cadastro />;

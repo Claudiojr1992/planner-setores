@@ -5,11 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Planner de Setores</title>
   <meta name="description" content="Planejamento e gestão de atividades e processos entre setores.">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='6' fill='%232152d9'/%3E%3Cpath d='M7 8h4v4H7zM13 12h4v4h-4zM11 10h3v2' stroke='white' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b7a75'/%3E%3Cg transform='translate%284.5 4.5%29 scale%28.95%29'%3E%3Crect x='1.5' y='1.5' width='10' height='10' rx='3' fill='white'/%3E%3Crect x='12.5' y='12.5' width='10' height='10' rx='3' fill='white' opacity='.55'/%3E%3Cpath d='M11.5 6.5h1.5c2.9 0 4.5 1.6 4.5 4.5v1.5' stroke='white' stroke-width='2.4' stroke-linecap='round' fill='none'/%3E%3C/g%3E%3C/svg%3E">
   <script>
     // aplica o tema antes de desenhar a página (evita "piscar")
     try { var t = localStorage.getItem('planner.tema') || 'sistema'; var e = t === 'escuro' || (t === 'sistema' && matchMedia('(prefers-color-scheme: dark)').matches); document.documentElement.dataset.theme = e ? 'dark' : 'light'; } catch (_) {}
+    // última cor de marca usada (evita trocar de cor ao carregar)
+    try { var m = localStorage.getItem('planner.marca'); if (/^#[0-9a-f]{6}$/i.test(m || '')) document.documentElement.style.setProperty('--marca', m); } catch (_) {}
   </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap">
   <script src="/config.js"></script>
   <link rel="stylesheet" href="/assets/app.css">
 </head>

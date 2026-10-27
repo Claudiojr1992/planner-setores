@@ -116,7 +116,7 @@ export function gerarDadosDemo() {
   perfis.forEach(p => { senhas[p.email] = SENHA_DEMO; });
 
   const db: { [K in NomeTabela]: Tabelas[K][] } & { __senhas: Record<string, string>; __seq: number } = {
-    empresa: [{ id: 1, nome: 'Grupo Exemplo S.A.', logo_url: null }],
+    empresa: [{ id: 1, nome: 'Grupo Exemplo S.A.', logo_url: null, cor_primaria: null }],
     perfis, setores, vinculos, fluxos: [fluxo1, fluxo2], atividades, historico,
     comentarios: [{ id: uuid(), atividade_id: byTit('Revisão de NCM dos produtos', fis).id, texto: 'Pausei até o Comercial enviar a lista de produtos novos.', autor_id: carla.id, criado_em: iso(-2, 15) }],
     anexos: [], notificacoes, ausencias,

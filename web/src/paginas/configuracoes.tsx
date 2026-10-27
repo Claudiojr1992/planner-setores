@@ -1,35 +1,62 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { LuUpload, LuTrash2, LuMail, LuSend, LuRefreshCw, LuCircleCheck, LuCircleAlert, LuClock, LuExternalLink, LuSave, LuWorkflow, LuSun, LuMoon, LuMonitor, LuKeyRound, LuLogOut, LuBell } from 'react-icons/lu';
+import { LuUpload, LuTrash2, LuMail, LuSend, LuRefreshCw, LuCircleCheck, LuCircleAlert, LuClock, LuExternalLink, LuSave, LuCheck, LuSun, LuMoon, LuMonitor, LuKeyRound, LuLogOut, LuBell } from 'react-icons/lu';
 import { useDados, type Tema } from '../app/contexto';
 import { navegar } from '../app/rota';
 import type { Envio, TeamsWebhook } from '../lib/types';
 import { PAPEL, fmtDataHora } from '../lib/regras';
-import { Avatar, Aviso, Campo, Painel, PontoSetor, Toggle } from '../ui/base';
+import { Avatar, Aviso, Campo, Marca, Painel, PontoSetor, Toggle } from '../ui/base';
+import { COR_PADRAO, CORES_SUGERIDAS, aplicarMarca, contraste, corValida } from '../app/marca';
 
 export function EmpresaMarca() {
   const { dados, svc, executar } = useDados();
+  const salva = corValida(dados.empresa.cor_primaria) ? dados.empresa.cor_primaria.toLowerCase() : null;
   const [nome, setNome] = useState(dados.empresa.nome);
+  const [cor, setCor] = useState<string>(salva || COR_PADRAO);
   const ref = useRef<HTMLInputElement>(null);
+  // pré-visualiza no sistema inteiro enquanto escolhe; volta à cor salva ao sair sem salvar
+  useEffect(() => { aplicarMarca(cor); }, [cor]);
+  useEffect(() => () => { aplicarMarca(dados.empresa.cor_primaria); }, [dados.empresa.cor_primaria]);
+  const contrasteOk = contraste(cor, '#ffffff') >= 3 || contraste(cor, '#10191f') >= 4.5;
+  const mudou = nome !== dados.empresa.nome || cor !== (salva || COR_PADRAO);
+  const logo = dados.empresa.logo_url;
   return <>
-    <div className="cabeca"><div className="t"><h1>Empresa e marca</h1><p>Nome e logotipo exibidos no menu, na tela de login e nos e-mails.</p></div></div>
+    <div className="cabeca"><div className="t"><h1>Empresa e marca</h1><p>Nome, logotipo e cor aparecem no menu, na tela de entrada e nos e-mails.</p></div>
+      <div className="sp">{mudou && <button className="btn" onClick={() => { setNome(dados.empresa.nome); setCor(salva || COR_PADRAO); }}>Descartar</button>}
+        <button className="btn pri" disabled={!mudou || nome.trim().length < 2} onClick={() => executar(() => svc.salvarEmpresa(nome, cor === COR_PADRAO ? null : cor), 'Marca salva')}><LuSave size={15} />Salvar marca</button></div></div>
     <div className="duas iguais">
-      <Painel titulo="Identificação">
-        <div className="col" style={{ gap: 14 }}>
-          <Campo rotulo="Nome da empresa"><input className="inp" value={nome} onChange={e => setNome(e.target.value)} /></Campo>
-          <div><button className="btn pri" disabled={nome === dados.empresa.nome} onClick={() => executar(() => svc.salvarEmpresa(nome), 'Nome atualizado')}><LuSave size={15} />Salvar</button></div>
-        </div>
-      </Painel>
-      <Painel titulo="Logotipo" sub="PNG, JPG ou SVG até 1 MB — fundo transparente ou branco">
-        <div className="col" style={{ gap: 14 }}>
-          <div style={{ border: '1px dashed var(--border-strong)', borderRadius: 12, minHeight: 120, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', padding: 16 }}>
-            {dados.empresa.logo_url ? <img src={dados.empresa.logo_url} alt="Logo" style={{ maxHeight: 90, maxWidth: '100%', objectFit: 'contain' }} /> : <span className="logo-pad" style={{ width: 56, height: 56 }}><LuWorkflow size={26} /></span>}
+      <div className="col" style={{ gap: 20 }}>
+        <Painel titulo="Nome"><Campo rotulo="Nome da empresa"><input className="inp" value={nome} onChange={e => setNome(e.target.value)} /></Campo></Painel>
+        <Painel titulo="Cor da marca" sub="usada no menu, nos botões e nos destaques">
+          <div className="col" style={{ gap: 14 }}>
+            <div className="cores">{CORES_SUGERIDAS.map(c => <button key={c} className={`cor ${cor === c ? 'on' : ''}`} style={{ ['--c' as string]: c }} onClick={() => setCor(c)} aria-label={`Usar a cor ${c}`} title={c === COR_PADRAO ? 'Padrão do Planner' : c}>{cor === c && <LuCheck size={16} />}</button>)}
+              <label className="row" style={{ gap: 8, marginLeft: 6 }}><input type="color" value={cor} onChange={e => setCor(e.target.value)} aria-label="Escolher outra cor" /><input className="inp" style={{ width: 110, fontVariantNumeric: 'tabular-nums' }} value={cor} maxLength={7}
+                onChange={e => { const v = e.target.value.startsWith('#') ? e.target.value : '#' + e.target.value; if (/^#[0-9a-f]{0,6}$/i.test(v)) setCor(v.length === 7 ? v.toLowerCase() : v); }} aria-label="Código da cor" /></label></div>
+            {!corValida(cor) ? <span className="sm muted">Digite a cor no formato #RRGGBB.</span>
+              : !contrasteOk ? <Aviso tipo="atencao">Essa cor tem pouco contraste com o texto dos botões. Prefira um tom mais escuro.</Aviso>
+                : <span className="sm muted">A versão para o tema escuro é ajustada automaticamente.</span>}
+            {cor !== COR_PADRAO && <div><button className="btn p fant" onClick={() => setCor(COR_PADRAO)}>Voltar à cor padrão do Planner</button></div>}
           </div>
-          <div className="row"><button className="btn pri" onClick={() => ref.current?.click()}><LuUpload size={15} />Enviar logotipo</button>
-            {dados.empresa.logo_url && <button className="btn perigo" onClick={() => executar(() => svc.removerLogo(), 'Logotipo removido')}><LuTrash2 size={14} />Remover</button>}</div>
-          <input ref={ref} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) executar(() => svc.enviarLogo(f), 'Logotipo atualizado'); e.target.value = ''; }} />
-          <div className="row" style={{ background: '#0b1424', borderRadius: 10, padding: 12, gap: 10 }}>
-            {dados.empresa.logo_url ? <img src={dados.empresa.logo_url} alt="" style={{ maxHeight: 32, maxWidth: 140, background: '#fff', borderRadius: 6, padding: '2px 4px' }} /> : <span className="logo-pad"><LuWorkflow size={18} /></span>}
-            <span style={{ color: '#fff', fontWeight: 700 }}>{nome}</span><span className="xs" style={{ color: '#7f8ca3', marginLeft: 'auto' }}>pré-visualização do menu</span></div>
+        </Painel>
+        <Painel titulo="Logotipo" sub="PNG, JPG ou SVG até 1 MB, com fundo transparente ou branco">
+          <div className="col" style={{ gap: 14 }}>
+            <div style={{ border: '1px dashed var(--border-strong)', borderRadius: 12, minHeight: 110, display: 'grid', placeItems: 'center', background: 'var(--surface-2)', padding: 16 }}>
+              {logo ? <img src={logo} alt="Logotipo" style={{ maxHeight: 80, maxWidth: '100%', objectFit: 'contain' }} /> : <span className="row muted sm"><Marca />Sem logotipo: o menu usa o símbolo do Planner na cor da marca.</span>}
+            </div>
+            <div className="row"><button className="btn" onClick={() => ref.current?.click()}><LuUpload size={15} />{logo ? 'Trocar logotipo' : 'Enviar logotipo'}</button>
+              {logo && <button className="btn perigo" onClick={() => executar(() => svc.removerLogo(), 'Logotipo removido')}><LuTrash2 size={14} />Remover</button>}</div>
+            <input ref={ref} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) executar(() => svc.enviarLogo(f), 'Logotipo atualizado'); e.target.value = ''; }} />
+          </div>
+        </Painel>
+      </div>
+      <Painel titulo="Prévia" sub="como a equipe vai ver">
+        <div className="col" style={{ gap: 14 }}>
+          <div className="previa-marca">
+            <div className="pm-side"><div className="pm-logo"><Marca logo={logo} nome={nome} tam={24} /><span className="ellipsis">{nome}</span></div><i className="on" /><i /><i /><i /></div>
+            <div className="pm-main"><b style={{ fontSize: 15 }}>Boa tarde, Ana</b><div className="pm-l" style={{ width: '70%' }} /><div className="pm-l" style={{ width: '45%' }} />
+              <div className="row" style={{ marginTop: 6 }}><button className="btn pri p" tabIndex={-1}><LuSend size={13} />Enviar solicitação</button><span className="pill t-accent">Na fila</span></div>
+              <div className="aviso info" style={{ marginTop: 4 }}><LuCircleCheck size={15} /><div>Destaques e seleções usam a cor da marca.</div></div></div>
+          </div>
+          <span className="sm muted">A cor é aplicada no sistema inteiro enquanto você escolhe. Clique em <b>Salvar marca</b> para valer para todos.</span>
         </div>
       </Painel>
     </div>
@@ -115,7 +142,7 @@ export function Perfil() {
   const [v, setV] = useState({ nome: eu.nome, cargo: eu.cargo || '' });
   const [s, setS] = useState({ a: '', b: '' });
   const setor = dados.setores.find(x => x.id === eu.setor_id);
-  const temas: [Tema, string, typeof LuSun, string[]][] = [['claro', 'Claro', LuSun, ['#f3f5f9', '#ffffff', '#2152d9']], ['escuro', 'Escuro', LuMoon, ['#0b0f16', '#131923', '#6b8cff']], ['sistema', 'Automático (sistema)', LuMonitor, ['#f3f5f9', '#131923', '#2152d9']]];
+  const temas: [Tema, string, typeof LuSun, string[]][] = [['claro', 'Claro', LuSun, ['#f3f5f4', '#ffffff', 'var(--marca)']], ['escuro', 'Escuro', LuMoon, ['#0d1417', '#202c32', 'color-mix(in oklab, var(--marca) 62%, #fff)']], ['sistema', 'Automático (segue o sistema)', LuMonitor, ['linear-gradient(90deg, #f3f5f4 50%, #0d1417 50%)', '#c7d0cc', 'var(--marca)']]];
   return <>
     <div className="cabeca"><div className="row" style={{ gap: 14 }}><Avatar p={eu} setores={dados.setores} tam="g" /><div className="t"><h1>{eu.nome}</h1><p>{eu.email} · {PAPEL[eu.papel]}{setor ? ` · ${setor.nome}` : ''}</p></div></div></div>
     <div className="duas iguais">

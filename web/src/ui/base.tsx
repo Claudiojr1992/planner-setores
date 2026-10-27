@@ -11,7 +11,33 @@ export function Avatar({ p, setores, tam = '', titulo }: { p?: Perfil | null; se
   return <span className={`av ${tam}`} style={{ ['--c' as string]: cor }} title={titulo || p.nome}>{iniciais(p.nome)}</span>;
 }
 export const PillStatus = ({ s }: { s: Status }) => <span className={`pill ponto t-${STATUS[s].tom}`}>{STATUS[s].rotulo}</span>;
-export const Pri = ({ p }: { p: Prioridade }) => <span className={`pri ${p}`}>{p === 'urgente' ? '▲▲ ' : p === 'alta' ? '▲ ' : ''}{PRIORIDADE[p].rotulo}</span>;
+export const Pri = ({ p }: { p: Prioridade }) => <span className={`prio ${p}`}>{p === 'urgente' ? '▲▲ ' : p === 'alta' ? '▲ ' : ''}{PRIORIDADE[p].rotulo}</span>;
+
+/** Símbolo "Elo": dois blocos (setores) ligados pela passagem do trabalho. */
+export function Simbolo({ tam = 20, classe = '' }: { tam?: number; classe?: string }) {
+  return <svg className={`simbolo ${classe}`} width={tam} height={tam} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="1.5" y="1.5" width="10" height="10" rx="3" fill="currentColor" />
+    <rect x="12.5" y="12.5" width="10" height="10" rx="3" fill="currentColor" opacity=".5" />
+    <path d="M11.5 6.5h1.5c2.9 0 4.5 1.6 4.5 4.5v1.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+  </svg>;
+}
+/** Marca do sistema: logotipo da empresa quando houver, senão o símbolo na cor da marca. */
+export function Marca({ logo, nome, tam = 34 }: { logo?: string | null; nome?: string; tam?: number }) {
+  return logo ? <img src={logo} alt={nome || 'Logotipo'} /> : <span className="logo-pad" style={{ width: tam, height: tam }}><Simbolo tam={tam} /></span>;
+}
+export const Kbd = ({ children }: { children: ReactNode }) => <kbd className="kbd">{children}</kbd>;
+
+/** Trilho de passagem: setores por onde o trabalho vem, está e vai. */
+export interface NoElo { setor?: Setor | null; atual?: boolean; previsto?: boolean; rotulo?: ReactNode; sub?: ReactNode; onClick?: () => void; titulo?: string }
+export function Elo({ nos, grande = false }: { nos: NoElo[]; grande?: boolean }) {
+  const lista = nos.filter(n => n.setor);
+  if (!lista.length) return null;
+  return <span className={`elo ${grande ? 'grande' : ''}`}>{lista.map((n, i) => <span key={i} className="row" style={{ gap: 0, minWidth: 0 }}>
+    {i > 0 && <span className={`liga ${n.previsto ? 'prev' : ''}`} style={{ ['--c1' as string]: lista[i - 1].setor?.cor, ['--c2' as string]: n.setor?.cor }} />}
+    <span className={`no-e ${n.atual ? 'atual' : ''} ${n.previsto ? 'prev' : ''}`} style={{ ['--c' as string]: n.setor?.cor }} title={n.titulo}
+      onClick={n.onClick ? e => { e.stopPropagation(); n.onClick?.(); } : undefined}><i /><span>{n.rotulo ?? n.setor?.nome}</span>{n.sub && <small>{n.sub}</small>}</span>
+  </span>)}</span>;
+}
 export const PontoSetor = ({ s }: { s?: Setor | null }) => <span className="ponto-cor" style={{ ['--c' as string]: s?.cor || '#999' }} />;
 
 export function Modal({ titulo, sub, onFechar, children, rodape, tam = '' }: { titulo: ReactNode; sub?: ReactNode; onFechar: () => void; children: ReactNode; rodape?: ReactNode; tam?: '' | 'largo' | 'estreito' }) {
