@@ -12,6 +12,7 @@ import { Atividades } from './paginas/atividades';
 import { GestaoEmpresa } from './paginas/empresa';
 import { EditorFluxo, ListaFluxos } from './paginas/fluxos';
 import { Ausencias } from './paginas/ausencias';
+import { IndicadoresMetas } from './paginas/indicadores';
 import { Pessoas, Setores } from './paginas/cadastros';
 import { EmpresaMarca, Integracoes, Perfil } from './paginas/configuracoes';
 
@@ -42,6 +43,7 @@ function Roteador() {
   const p = rota.partes;
   if (c === '/atividades') { titulo = 'Atividades'; pagina = <Atividades rota={rota} />; }
   else if (c === '/setor') { titulo = 'Painel do setor'; pagina = gestor ? <PainelSetor /> : <SemAcesso />; }
+  else if (c === '/indicadores') { titulo = 'Indicadores e metas'; pagina = gestor ? <IndicadoresMetas /> : <SemAcesso />; }
   else if (c === '/ausencias') { titulo = 'Férias e delegação'; pagina = gestor ? <Ausencias /> : <SemAcesso />; }
   else if (c === '/empresa') { titulo = 'Gestão da empresa'; pagina = gestor ? <GestaoEmpresa /> : <SemAcesso />; }
   else if (c === '/fluxos') { titulo = 'Fluxos de processo'; pagina = gestor ? <ListaFluxos /> : <SemAcesso />; }

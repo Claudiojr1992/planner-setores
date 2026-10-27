@@ -600,6 +600,42 @@ table.tb td.d, table.tb th.d { text-align: right; }
 .previa-marca .pm-main { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
 .previa-marca .pm-main .pm-l { height: 10px; border-radius: 5px; background: var(--surface-3); }
 
+/* ---------- indicadores e metas ---------- */
+.placar { display: grid; grid-template-columns: minmax(230px, 1.5fr) repeat(5, minmax(120px, 1fr)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; }
+.placar .cel { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; border-left: 1px solid var(--border); min-width: 0; }
+.placar .cel:first-child { border-left: 0; }
+.placar .cel.destaque { background: var(--surface-2); gap: 8px; }
+.placar .l { font-size: 12.5px; font-weight: 600; color: var(--text-2); }
+.placar .v { font-size: 26px; font-weight: 650; letter-spacing: -.025em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.placar .destaque .v { font-size: 38px; }
+.placar .v.zero { color: var(--muted); font-weight: 500; }
+.t-ambar { color: var(--amber); } .t-verm { color: var(--red); }
+.barra-meta { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.barra-meta .num { font-size: 12.5px; font-weight: 600; min-width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.trilho-b { position: relative; flex: 1; height: 8px; background: var(--surface-3); border-radius: 4px; min-width: 60px; }
+.trilho-b.fino { height: 5px; flex: none; width: 100%; margin-top: 4px; }
+.trilho-b i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--line); max-width: 100%; }
+.trilho-b i.s-na_meta { background: var(--green); } .trilho-b i.s-atencao { background: var(--amber); } .trilho-b i.s-abaixo { background: var(--red); }
+.trilho-b b { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text); border-radius: 1px; }
+.trilho-b b.limiar { background: var(--muted); opacity: .6; }
+.grafico-sla svg { width: 100%; height: auto; display: block; max-height: 260px; }
+.grafico-sla .grade-g { stroke: var(--border); stroke-width: 1; }
+.grafico-sla .eixo { fill: var(--muted); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.grafico-sla .valor-g { fill: var(--text); font-size: 12px; font-weight: 650; }
+.grafico-sla .barra-g { fill: var(--accent); opacity: .85; transition: opacity .12s; }
+.grafico-sla .barra-g.foco { opacity: 1; }
+.grafico-sla g:focus { outline: none; } .grafico-sla g:focus .barra-g { stroke: var(--text); stroke-width: 2; }
+.grafico-sla .meta-g { stroke: var(--text); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.grafico-sla .rot-meta { fill: var(--text-2); font-size: 11.5px; font-weight: 600; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; }
+.dica-g { font-size: 13px; color: var(--text-2); min-height: 22px; margin-top: 6px; }
+.metas-tb th, .metas-tb td { white-space: nowrap; }
+.metas-tb tr.herdada td { color: var(--muted); }
+.metas-tb tr.herdada td:first-child b { color: var(--text); }
+.metas-tb tr.editando td { background: var(--accent-soft); }
+.num-inp { width: 76px; min-height: 32px; padding: 4px 8px; text-align: right; font-variant-numeric: tabular-nums; margin-left: auto; display: block; }
+@media (max-width: 1280px) { .placar { grid-template-columns: repeat(3, minmax(0, 1fr)); } .placar .cel { border-top: 1px solid var(--border); } .placar .cel:nth-child(-n+3) { border-top: 0; } .placar .cel:nth-child(3n+1) { border-left: 0; } }
+@media (max-width: 640px) { .placar { grid-template-columns: repeat(2, minmax(0, 1fr)); } .placar .cel.destaque { grid-column: 1 / -1; } .placar .cel { border-left: 0; border-top: 1px solid var(--border); } .placar .cel:first-child { border-top: 0; } .placar .cel:nth-child(odd):not(:first-child) { border-left: 1px solid var(--border); } }
+
 /* ---------- responsivo ---------- */
 @media (max-width: 1280px) { .editor { grid-template-columns: 200px minmax(0, 1fr); } .editor .props { grid-column: 1 / -1; } .editor { height: auto; } .editor .grafo { height: 620px; } .mesa { grid-template-columns: minmax(0, 1fr) 320px; } }
 @media (max-width: 1100px) { .duas, .duas.iguais, .duas.lateral, .mesa { grid-template-columns: 1fr; } .top .busca { display: none; } }

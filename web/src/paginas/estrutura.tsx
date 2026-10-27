@@ -2,12 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   LuHouse, LuListChecks, LuLayoutDashboard, LuTreePalm, LuNetwork, LuWorkflow, LuBuilding2, LuUsers, LuImage, LuPlug,
-  LuBell, LuSun, LuMoon, LuLogOut, LuSearch, LuPlus, LuMenu, LuPanelLeftClose, LuPanelLeft, LuUser, LuMonitor, LuCheck, LuCheckCheck,
+  LuBell, LuGauge, LuSun, LuMoon, LuLogOut, LuSearch, LuPlus, LuMenu, LuPanelLeftClose, LuPanelLeft, LuUser, LuMonitor, LuCheck, LuCheckCheck,
 } from 'react-icons/lu';
 import { useDados, type Tema } from '../app/contexto';
 import { navegar } from '../app/rota';
 import { NOME_SISTEMA } from '../app/config';
-import { PAPEL, ehAdmin, ehGestor, setoresGeridos, tempoRelativo } from '../lib/regras';
+import { PAPEL, aberta, ehAdmin, ehGestor, setoresGeridos, slaAtividade, tempoRelativo } from '../lib/regras';
 import { Avatar, Kbd, Marca, Suspenso } from '../ui/base';
 
 interface Item { para: string; rotulo: string; Ic: typeof LuHouse; cont?: number; alerta?: boolean }
@@ -33,11 +33,13 @@ export function Estrutura({ caminho, titulo, children }: { caminho: string; titu
   const pendSetor = dados.atividades.filter(a => geridos.includes(a.setor_id) && (a.status === 'aguardando_aceite' || a.status === 'a_distribuir')).length;
   const minhas = dados.atividades.filter(a => a.responsavel_id === eu.id && ['na_fila', 'em_andamento', 'pausada'].includes(a.status)).length;
   const pendentes = dados.perfis.filter(p => !p.ativo).length;
+  const slaEstourado = dados.atividades.filter(a => geridos.includes(a.setor_id) && aberta(a) && slaAtividade(a, dados.metas).situacao === 'estourado').length;
   const grupos: { titulo: string; itens: Item[] }[] = [
     { titulo: 'Meu trabalho', itens: [{ para: '/', rotulo: 'Início', Ic: LuHouse, cont: minhas }, { para: '/atividades', rotulo: 'Atividades', Ic: LuListChecks }] },
   ];
   if (gestor) grupos.push({ titulo: 'Gestão', itens: [
     { para: '/setor', rotulo: 'Painel do setor', Ic: LuLayoutDashboard, cont: pendSetor, alerta: pendSetor > 0 },
+    { para: '/indicadores', rotulo: 'Indicadores e metas', Ic: LuGauge, cont: slaEstourado, alerta: slaEstourado > 0 },
     { para: '/ausencias', rotulo: 'Férias e delegação', Ic: LuTreePalm },
     { para: '/empresa', rotulo: 'Gestão da empresa', Ic: LuNetwork },
     { para: '/fluxos', rotulo: 'Fluxos de processo', Ic: LuWorkflow },

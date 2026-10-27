@@ -1,6 +1,6 @@
 /* Regras de negócio puras (sem acesso a dados) — testáveis isoladamente. */
 import type {
-  Atividade, Ausencia, Dados, Fluxo, FluxoNo, Perfil, Prioridade, Setor, Status, TipoAusencia, Vinculo,
+  Atividade, Ausencia, Dados, Fluxo, FluxoNo, Meta, Perfil, Prioridade, SlaDias, Setor, Status, TipoAusencia, Vinculo,
 } from './types';
 
 /* ---------------- datas ---------------- */
@@ -206,3 +206,109 @@ export const atividadesDoProcesso = (todas: Atividade[], processoId: string) =>
 export const iniciais = (nome: string) =>
   nome.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?';
 export const primeiroNome = (nome: string | undefined) => (nome || '').split(' ')[0];
+
+/* ---------------- SLA e metas ---------------- */
+export const SLA_PADRAO: Omit<Meta, 'id' | 'setor_id' | 'criado_em'> = {
+  sla_dias: { urgente: 1, alta: 2, media: 5, baixa: 10 }, sla_aceite_horas: 8, meta_sla_pct: 90, meta_concluidas_mes: null,
+};
+/** Fração do prazo consumida a partir da qual a atividade fica "em risco". */
+export const LIMIAR_RISCO = 0.75;
+export type OrigemMeta = 'setor' | 'empresa' | 'padrao';
+/** Meta que vale para o setor: a do próprio setor, senão a da empresa, senão o padrão do sistema. */
+export function metaDoSetor(metas: Meta[], setorId: string | null | undefined): Meta & { origem: OrigemMeta } {
+  const doSetor = setorId ? metas.find(m => m.setor_id === setorId) : null;
+  if (doSetor) return { ...doSetor, sla_dias: { ...SLA_PADRAO.sla_dias, ...doSetor.sla_dias }, origem: 'setor' };
+  const emp = metas.find(m => !m.setor_id);
+  if (emp) return { ...emp, sla_dias: { ...SLA_PADRAO.sla_dias, ...emp.sla_dias }, origem: 'empresa' };
+  return { id: '', setor_id: null, criado_em: '', ...SLA_PADRAO, origem: 'padrao' };
+}
+/** Fim do expediente (23:59) do n-ésimo dia útil após a data (sábado e domingo não contam). n = 0 → hoje, ou o próximo dia útil. */
+export function limiteDiasUteis(inicio: Date, n: number): Date {
+  const d = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate(), 23, 59, 59, 999);
+  const util = (x: Date) => x.getDay() !== 0 && x.getDay() !== 6;
+  while (!util(d)) d.setDate(d.getDate() + 1);
+  let falta = Math.max(0, Math.round(n));
+  while (falta > 0) { d.setDate(d.getDate() + 1); if (util(d)) falta--; }
+  return d;
+}
+/** Dias úteis entre duas datas (para exibir "faltam 2 dias úteis"). */
+export function diasUteisEntre(a: Date, b: Date): number {
+  const sinal = b >= a ? 1 : -1; const [x, y] = sinal > 0 ? [a, b] : [b, a];
+  const d = new Date(x.getFullYear(), x.getMonth(), x.getDate()); const fim = new Date(y.getFullYear(), y.getMonth(), y.getDate());
+  let n = 0; while (d < fim) { d.setDate(d.getDate() + 1); if (d.getDay() !== 0 && d.getDay() !== 6) n++; }
+  return n * sinal;
+}
+/** Milissegundos entre a e b contando só dias úteis (fim de semana não consome prazo). */
+export function msUteis(a: Date, b: Date): number {
+  if (b <= a) return 0;
+  let t = 0; const d = new Date(a);
+  while (d < b) {
+    const fimDia = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    const ate = fimDia < b ? fimDia : b;
+    if (d.getDay() !== 0 && d.getDay() !== 6) t += ate.getTime() - d.getTime();
+    d.setTime(ate.getTime());
+  }
+  return t;
+}
+export type SituacaoSla = 'no_prazo' | 'em_risco' | 'estourado' | 'cumprido' | 'violado' | 'sem_sla';
+export interface SlaInfo { situacao: SituacaoSla; inicio: Date; limite: Date; consumo: number; dias: number }
+export const SITUACAO_SLA: Record<SituacaoSla, { rotulo: string; tom: string }> = {
+  no_prazo: { rotulo: 'No prazo', tom: 'green' }, em_risco: { rotulo: 'Em risco', tom: 'amber' }, estourado: { rotulo: 'Estourado', tom: 'red' },
+  cumprido: { rotulo: 'Cumprido', tom: 'green' }, violado: { rotulo: 'Fora do SLA', tom: 'red' }, sem_sla: { rotulo: 'Sem SLA', tom: 'gray' },
+};
+/** SLA de conclusão: conta da abertura do pedido até a conclusão, em dias úteis conforme a prioridade. */
+export function slaAtividade(a: Atividade, metas: Meta[], agora = new Date()): SlaInfo {
+  const m = metaDoSetor(metas, a.setor_id);
+  const dias = (m.sla_dias as SlaDias)[a.prioridade] ?? SLA_PADRAO.sla_dias[a.prioridade];
+  const inicio = new Date(a.criado_em);
+  const limite = limiteDiasUteis(inicio, dias);
+  const fim = a.status === 'concluida' && a.concluido_em ? new Date(a.concluido_em) : agora;
+  const consumo = msUteis(inicio, fim) / Math.max(1, msUteis(inicio, limite));
+  let situacao: SituacaoSla;
+  if (a.status === 'recusada' || a.status === 'cancelada') situacao = 'sem_sla';
+  else if (a.status === 'concluida') situacao = fim <= limite ? 'cumprido' : 'violado';
+  else situacao = fim > limite ? 'estourado' : consumo >= LIMIAR_RISCO ? 'em_risco' : 'no_prazo';
+  return { situacao, inicio, limite, consumo, dias };
+}
+/** SLA de aceite em horas corridas: da chegada ao setor até o aceite do gestor. null quando não passou por aceite. */
+export function slaAceite(a: Atividade, metas: Meta[], agora = new Date()): { situacao: SituacaoSla; horas: number; limiteHoras: number } | null {
+  const lim = metaDoSetor(metas, a.setor_id).sla_aceite_horas;
+  const ini = new Date(a.criado_em).getTime();
+  if (a.status === 'aguardando_aceite') {
+    const h = (agora.getTime() - ini) / 3600000;
+    return { situacao: h > lim ? 'estourado' : h >= lim * LIMIAR_RISCO ? 'em_risco' : 'no_prazo', horas: h, limiteHoras: lim };
+  }
+  if (!a.aceito_em) return null;
+  const h = (new Date(a.aceito_em).getTime() - ini) / 3600000;
+  return { situacao: h <= lim ? 'cumprido' : 'violado', horas: h, limiteHoras: lim };
+}
+export interface ResumoSla {
+  concluidas: number; cumpridas: number; pctSla: number | null;
+  abertas: number; emRisco: number; estouradas: number;
+  aceites: number; aceitesNoSla: number; pctAceite: number | null; aceiteMedioH: number | null;
+  conclusaoMediaDias: number | null;
+}
+/** Consolida o SLA de uma lista: concluídas dentro do período (de/ate em YYYY-MM-DD) e situação atual das abertas. */
+export function resumoSla(lista: Atividade[], metas: Meta[], de: string, ate: string, agora = new Date()): ResumoSla {
+  const noPeriodo = (iso?: string | null) => { const d = diaDe(iso); return !!d && d >= de && d <= ate; };
+  const conc = lista.filter(a => a.status === 'concluida' && noPeriodo(a.concluido_em));
+  const slas = conc.map(a => slaAtividade(a, metas, agora));
+  const cumpridas = slas.filter(s => s.situacao === 'cumprido').length;
+  const abertasL = lista.filter(aberta);
+  const sitAb = abertasL.map(a => slaAtividade(a, metas, agora).situacao);
+  const aceitos = lista.filter(a => a.aceito_em && noPeriodo(a.aceito_em)).map(a => slaAceite(a, metas, agora)!);
+  const media = (v: number[]) => (v.length ? v.reduce((s, x) => s + x, 0) / v.length : null);
+  const dur = conc.map(a => (new Date(a.concluido_em as string).getTime() - new Date(a.criado_em).getTime()) / 86400000);
+  return {
+    concluidas: conc.length, cumpridas, pctSla: conc.length ? Math.round((cumpridas / conc.length) * 100) : null,
+    abertas: abertasL.length, emRisco: sitAb.filter(s => s === 'em_risco').length, estouradas: sitAb.filter(s => s === 'estourado').length,
+    aceites: aceitos.length, aceitesNoSla: aceitos.filter(x => x.situacao === 'cumprido').length,
+    pctAceite: aceitos.length ? Math.round((aceitos.filter(x => x.situacao === 'cumprido').length / aceitos.length) * 100) : null,
+    aceiteMedioH: media(aceitos.map(x => x.horas)), conclusaoMediaDias: media(dur),
+  };
+}
+/** Situação de uma equipe frente à meta de % no SLA: na meta, atenção (até 10 pontos abaixo) ou abaixo. */
+export function situacaoMeta(pct: number | null, meta: number): 'na_meta' | 'atencao' | 'abaixo' | 'sem_dados' {
+  if (pct == null) return 'sem_dados';
+  return pct >= meta ? 'na_meta' : pct >= meta - 10 ? 'atencao' : 'abaixo';
+}

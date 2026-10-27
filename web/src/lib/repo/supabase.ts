@@ -24,6 +24,7 @@ const TRADUCOES: [RegExp, string][] = [
   [/jwt expired/i, 'Sua sessão expirou. Entre novamente.'],
   [/duplicate key value.*vinculo_unico/i, 'Já existe um vínculo entre estes setores.'],
   [/violates foreign key.*atividades_setor_id/i, 'Este setor possui atividades e não pode ser excluído.'],
+  [/could not find the table 'public\.metas'|relation "public\.metas" does not exist/i, 'As metas ainda não estão ativadas neste banco. Aplique a atualização supabase/migrations/20261027010000_metas_sla.sql.'],
   [/failed to fetch|networkerror/i, 'Não foi possível conectar ao servidor. Verifique se o Supabase está em execução.'],
 ];
 const traduzir = (m: string) => {

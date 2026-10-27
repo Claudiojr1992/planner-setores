@@ -4,11 +4,11 @@
  */
 import type {
   Anexo, Atividade, Ausencia, Comentario, Dados, Envio, Fluxo, FluxoNo, Historico, Notificacao,
-  Perfil, Prioridade, Setor, TeamsWebhook, TipoAusencia, Vinculo,
+  Meta, Perfil, Prioridade, Setor, TeamsWebhook, TipoAusencia, Vinculo,
 } from './types';
 import {
   FINAIS, addDias, agoraISO, ausenciaNoPeriodo, ehAdmin, fmtData, gere, hoje, podeExecutar,
-  primeirasEtapas, proximosNos, uuid, validarFluxo, vinculoEntre, TIPO_AUSENCIA,
+  primeirasEtapas, proximosNos, uuid, validarFluxo, vinculoEntre, PRIORIDADE, TIPO_AUSENCIA,
 } from './regras';
 import { ErroApp, type Repo } from './repo/repo';
 
@@ -166,7 +166,10 @@ export class Servico {
     this.exigir(gere(this.eu, a.setor_id, this.d.setores), 'Somente o gestor do setor pode aceitar.');
     const l = new Lote();
     const resp = op.responsavel_id || null;
-    await this.repo.atualizar('atividades', a.id, { status: resp ? 'na_fila' : 'a_distribuir', responsavel_id: resp, prazo: op.prazo || a.prazo });
+    const mudanca = { status: resp ? 'na_fila' as const : 'a_distribuir' as const, responsavel_id: resp, prazo: op.prazo || a.prazo };
+    // aceito_em alimenta o SLA de aceite; bancos ainda sem a coluna seguem funcionando sem ela
+    try { await this.repo.atualizar('atividades', a.id, { ...mudanca, aceito_em: agoraISO() }); }
+    catch (e: any) { if (/aceito_em/.test(String(e?.message))) await this.repo.atualizar('atividades', a.id, mudanca); else throw e; }
     this.registrar(l, a.id, `Aceita por ${this.eu.nome}${resp ? ` e atribuída a ${this.nomePessoa(resp)}` : ''}`);
     const texto = `${this.nomeSetor(a.setor_id)} aceitou “${a.titulo}”.`;
     this.notificar(l, a.criado_por, 'Solicitação aceita', texto, a.id);
@@ -582,6 +585,25 @@ export class Servico {
     await this.repo.atualizar('empresa', 1, { logo_url: url });
   }
   async removerLogo() { this.exigir(ehAdmin(this.eu), 'Sem permissão.'); await this.repo.atualizar('empresa', 1, { logo_url: null }); }
+
+  /* ======================= metas e SLA ======================= */
+  /** Cria ou atualiza as metas de um setor (setorId = null → padrão da empresa, só a diretoria). */
+  async salvarMeta(setorId: string | null, v: Pick<Meta, 'sla_dias' | 'sla_aceite_horas' | 'meta_sla_pct' | 'meta_concluidas_mes'>) {
+    this.exigir(setorId ? gere(this.eu, setorId, this.d.setores) : ehAdmin(this.eu), setorId ? 'Somente o gestor do setor ou a diretoria define as metas do setor.' : 'Somente a diretoria define o padrão da empresa.');
+    for (const [k, n] of Object.entries(v.sla_dias)) this.exigir(Number.isInteger(n) && n >= 0 && n <= 90, `O SLA da prioridade ${PRIORIDADE[k as Prioridade]?.rotulo || k} deve ser de 0 a 90 dias úteis.`);
+    this.exigir(Number.isInteger(v.sla_aceite_horas) && v.sla_aceite_horas >= 1 && v.sla_aceite_horas <= 240, 'O SLA de aceite deve ser de 1 a 240 horas.');
+    this.exigir(Number.isInteger(v.meta_sla_pct) && v.meta_sla_pct >= 1 && v.meta_sla_pct <= 100, 'A meta de atividades no SLA deve ser de 1% a 100%.');
+    this.exigir(v.meta_concluidas_mes == null || (Number.isInteger(v.meta_concluidas_mes) && v.meta_concluidas_mes >= 0), 'A meta de entregas por mês deve ser um número inteiro.');
+    const atual = this.d.metas.find(m => (m.setor_id || null) === setorId);
+    const dados = { sla_dias: v.sla_dias, sla_aceite_horas: v.sla_aceite_horas, meta_sla_pct: v.meta_sla_pct, meta_concluidas_mes: v.meta_concluidas_mes ?? null, atualizado_em: agoraISO() };
+    if (atual) await this.repo.atualizar('metas', atual.id, dados);
+    else await this.repo.inserir('metas', [{ setor_id: setorId, ...dados }]);
+  }
+  /** O setor volta a usar o padrão da empresa. */
+  async removerMeta(m: Meta) {
+    this.exigir(!!m.setor_id && gere(this.eu, m.setor_id, this.d.setores), 'Sem permissão para alterar as metas deste setor.');
+    await this.repo.remover('metas', m.id);
+  }
 
   /* ======================= integrações ======================= */
   async salvarIntegracoes(p: Partial<Dados['integracoes']>) {

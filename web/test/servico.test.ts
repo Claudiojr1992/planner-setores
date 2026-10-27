@@ -2,7 +2,7 @@
 import { DemoRepo } from '../src/lib/repo/demo';
 import { carregarDados } from '../src/lib/dados';
 import { Servico } from '../src/lib/servico';
-import { validarFluxo, destinosPermitidos, indicadores } from '../src/lib/regras';
+import { validarFluxo, destinosPermitidos, indicadores, limiteDiasUteis, slaAtividade, slaAceite, metaDoSetor, resumoSla, situacaoMeta } from '../src/lib/regras';
 import type { Dados, Perfil } from '../src/lib/types';
 
 let ok = 0, falhas = 0;
@@ -146,6 +146,33 @@ const atvs = (titulo: string) => dados.atividades.filter(a => a.titulo === titul
   await svc.salvarPerfil(pend2.id, { ativo: true, setor_id: setor('Comercial').id, papel: 'colaborador' });
   await recarregar();
   t('admin aprova cadastro pendente', dados.perfis.find(p => p.id === pend2.id)!.ativo);
+
+  // ---------- SLA e metas ----------
+  const sexta = new Date(2026, 9, 23, 10); // sexta-feira
+  t('SLA: 1 dia útil a partir de sexta vence na segunda', limiteDiasUteis(sexta, 1).getDay() === 1 && limiteDiasUteis(sexta, 1).getDate() === 26);
+  t('SLA: pedido aberto no sábado conta a partir de segunda', limiteDiasUteis(new Date(2026, 9, 24, 10), 0).getDate() === 26);
+  const base = { ...dados.atividades[0], status: 'na_fila' as const, prioridade: 'media' as const, criado_em: new Date(2026, 9, 19, 9).toISOString(), concluido_em: null, aceito_em: null, setor_id: 'x' };
+  const metas = [{ id: 'm', setor_id: null, sla_dias: { urgente: 1, alta: 2, media: 5, baixa: 10 }, sla_aceite_horas: 8, meta_sla_pct: 90, meta_concluidas_mes: null, criado_em: '' }];
+  t('SLA: no prazo no início', slaAtividade(base, metas, new Date(2026, 9, 20, 9)).situacao === 'no_prazo');
+  t('SLA: em risco ao passar de 75%', slaAtividade(base, metas, new Date(2026, 9, 24, 20)).situacao === 'em_risco');
+  t('SLA: estourado depois do limite (seg 19 + 5 úteis = seg 26)', slaAtividade(base, metas, new Date(2026, 9, 27, 9)).situacao === 'estourado');
+  t('SLA: concluída dentro do limite = cumprido', slaAtividade({ ...base, status: 'concluida', concluido_em: new Date(2026, 9, 26, 18).toISOString() }, metas).situacao === 'cumprido');
+  t('SLA: concluída depois = fora do SLA', slaAtividade({ ...base, status: 'concluida', concluido_em: new Date(2026, 9, 27, 8).toISOString() }, metas).situacao === 'violado');
+  t('SLA: cancelada não conta', slaAtividade({ ...base, status: 'cancelada' }, metas).situacao === 'sem_sla');
+  t('SLA de aceite: 10 h com limite de 8 h = fora', slaAceite({ ...base, aceito_em: new Date(2026, 9, 19, 19).toISOString() }, metas)?.situacao === 'violado');
+  t('meta do setor sobrepõe o padrão da empresa', metaDoSetor([...metas, { ...metas[0], id: 's', setor_id: 'x', meta_sla_pct: 95 }], 'x').meta_sla_pct === 95 && metaDoSetor(metas, 'y').origem === 'empresa');
+  const r = resumoSla([{ ...base, status: 'concluida', concluido_em: new Date(2026, 9, 21, 9).toISOString() }, { ...base, id: 'b', status: 'concluida', concluido_em: new Date(2026, 9, 30, 9).toISOString() }], metas, '2026-10-01', '2026-10-31');
+  t('resumo: 1 de 2 no SLA = 50%', r.concluidas === 2 && r.pctSla === 50);
+  t('situação da meta: 85% com meta 90% = atenção', situacaoMeta(85, 90) === 'atencao' && situacaoMeta(70, 90) === 'abaixo' && situacaoMeta(90, 90) === 'na_meta');
+  // gestor define meta do próprio setor; colaborador não pode
+  await como('ana@empresa.com.br');
+  const fisId = eu.setor_id!;
+  await svc.salvarMeta(fisId, { sla_dias: { urgente: 1, alta: 2, media: 3, baixa: 6 }, sla_aceite_horas: 4, meta_sla_pct: 95, meta_concluidas_mes: 20 });
+  dados = await carregarDados(repo, eu.id);
+  t('gestor salva a meta do seu setor', metaDoSetor(dados.metas, fisId).sla_dias.media === 3 && metaDoSetor(dados.metas, fisId).meta_sla_pct === 95);
+  t('gestor não altera o padrão da empresa', /diretoria/.test(await erro(() => svc.salvarMeta(null, metaDoSetor(dados.metas, null)))));
+  await como('bruno@empresa.com.br');
+  t('colaborador não define metas', /gestor/.test(await erro(() => svc.salvarMeta(fisId, metaDoSetor(dados.metas, fisId)))));
 
   console.log(`\n${ok} passaram, ${falhas} falharam`);
   (globalThis as any).process.exit(falhas ? 1 : 0);

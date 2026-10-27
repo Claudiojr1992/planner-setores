@@ -44,6 +44,7 @@ No dia a dia, use **`INICIAR.bat`** para ligar e **`PARAR.bat`** para desligar. 
 - **Fluxos de processo:** editor de fluxograma com Início, Etapas (setor, prazo, exigir aceite) e Fim.
   - Etapas podem rodar em paralelo e convergir.
   - Alterar o fluxo vale para as próximas conclusões, inclusive dos processos que já estão rodando.
+- **Indicadores e metas:** SLA por setor e prioridade em dias úteis, metas por equipe, placar, evolução semanal, resultado por equipe e por pessoa, e a lista de atividades em risco ou estouradas.
 - **Férias e delegação:** programe a ausência e escolha, atividade por atividade, para quem delegar as pendentes, as a iniciar e as em andamento. No retorno, devolva tudo com um clique.
 - **Detalhe da atividade:**
   - trilha do processo entre setores;
@@ -89,3 +90,4 @@ docs/                documentação completa
 7. [Desenvolvimento e testes](docs/07-DESENVOLVIMENTO.md)
 8. [Publicar na nuvem: GitHub + Vercel + Supabase](docs/08-PUBLICAR-NA-NUVEM.md)
 9. [Identidade visual e experiência](docs/09-IDENTIDADE-VISUAL.md)
+10. [Indicadores e metas (SLA)](docs/10-INDICADORES-E-METAS.md)

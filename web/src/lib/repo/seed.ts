@@ -1,6 +1,6 @@
 /* Dados de exemplo do modo demonstração (datas relativas a hoje). */
-import type { Atividade, Fluxo, FluxoDefinicao, NomeTabela, Perfil, Setor, Tabelas } from '../types';
-import { addDias, uuid } from '../regras';
+import type { Atividade, Fluxo, FluxoDefinicao, Meta, NomeTabela, Perfil, Prioridade, Setor, Tabelas } from '../types';
+import { addDias, uuid, SLA_PADRAO } from '../regras';
 
 export const SENHA_DEMO = 'demo123';
 
@@ -98,6 +98,52 @@ export function gerarDadosDemo() {
   A({ titulo: 'Proposta comercial – Cliente Atlas', setor_id: com.id, responsavel_id: lucas.id, status: 'na_fila', prioridade: 'alta', prazo: addDias(4), criado_por: karina.id });
   A({ titulo: 'Relatório de comissões', setor_id: com.id, status: 'a_distribuir', prazo: addDias(6), encaminhar_para: fin.id, criado_por: karina.id });
 
+  // ---- histórico de 9 semanas para os indicadores de SLA (determinístico) ----
+  let semente = 7;
+  const rnd = () => (semente = (semente * 9301 + 49297) % 233280) / 233280;
+  const metas: Meta[] = [
+    { id: uuid(), setor_id: null, ...SLA_PADRAO, sla_dias: { ...SLA_PADRAO.sla_dias }, criado_em: iso(-90), atualizado_em: iso(-90) },
+    { id: uuid(), setor_id: fis.id, sla_dias: { urgente: 1, alta: 2, media: 4, baixa: 8 }, sla_aceite_horas: 4, meta_sla_pct: 92, meta_concluidas_mes: 14, criado_em: iso(-60), atualizado_em: iso(-60) },
+    { id: uuid(), setor_id: dp.id, sla_dias: { urgente: 1, alta: 3, media: 5, baixa: 10 }, sla_aceite_horas: 8, meta_sla_pct: 85, meta_concluidas_mes: 10, criado_em: iso(-60), atualizado_em: iso(-60) },
+  ];
+  const slaDe = (s: Setor) => (metas.find(m => m.setor_id === s.id) || metas[0]).sla_dias;
+  const taxa: Record<string, number> = { [fis.id]: 0.84, [con.id]: 0.93, [fin.id]: 0.96, [dp.id]: 0.74, [com.id]: 0.88 };
+  const rotinas: Record<string, string[]> = {
+    [fis.id]: ['Conferência de notas de saída', 'Apuração de ISS', 'Escrituração de entradas', 'Revisão de CFOP', 'Guia de ICMS-ST'],
+    [con.id]: ['Conciliação bancária', 'Lançamento de despesas', 'Revisão do balancete', 'Provisão de férias', 'Ajuste de estoque'],
+    [fin.id]: ['Pagamento de fornecedores', 'Baixa de recebíveis', 'Cobrança de inadimplentes', 'Conferência de boletos', 'Fluxo de caixa semanal'],
+    [dp.id]: ['Cálculo de horas extras', 'Admissão de colaborador', 'Rescisão contratual', 'Envio do eSocial', 'Cálculo de férias'],
+    [com.id]: ['Proposta para cliente', 'Renovação de contrato', 'Cadastro de cliente', 'Relatório de vendas', 'Atendimento pós-venda'],
+  };
+  for (const st of setores) {
+    const equipe = perfis.filter(p => p.setor_id === st.id && p.ativo);
+    for (let w = 9; w >= 1; w--) {
+      const n = 2 + Math.floor(rnd() * 3);
+      for (let k = 0; k < n; k++) {
+        const r = rnd();
+        const pr: Prioridade = r < 0.1 ? 'urgente' : r < 0.3 ? 'alta' : r < 0.85 ? 'media' : 'baixa';
+        const dias = slaDe(st)[pr];
+        const criadoDias = -(w * 7) + Math.floor(rnd() * 5);
+        const ok = rnd() < taxa[st.id];
+        const dur = ok ? 0.25 + rnd() * dias * 0.95 : dias * 1.45 + 1 + rnd() * 3;
+        const ini = new Date(iso(criadoDias, 9)).getTime();
+        const fimMs = Math.min(ini + dur * 86400000, Date.now() - 3600000);
+        const rot = rotinas[st.id];
+        const outro = rnd() < 0.45 ? setores.filter(x => x.id !== st.id)[Math.floor(rnd() * 4)] : null;
+        A({
+          titulo: `${rot[Math.floor(rnd() * rot.length)]} – ${new Date(ini).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`,
+          setor_id: st.id, responsavel_id: equipe[Math.floor(rnd() * equipe.length)]?.id || null, status: 'concluida', prioridade: pr,
+          prazo: addDias(criadoDias + Math.ceil(dias * 1.4)), concluido_em: new Date(fimMs).toISOString(),
+          criado_por: outro ? (outro.gestor_id || roberta.id) : (st.gestor_id || roberta.id), solicitante_setor_id: outro?.id || st.id,
+          aceito_em: outro ? new Date(ini + (0.3 + rnd() * 11) * 3600000).toISOString() : null,
+        }, criadoDias);
+      }
+    }
+  }
+  // atividades abertas que já passaram pelo aceite do gestor
+  for (const a of atividades) if (!a.aceito_em && a.solicitante_setor_id && a.solicitante_setor_id !== a.setor_id && a.status !== 'aguardando_aceite')
+    a.aceito_em = new Date(new Date(a.criado_em).getTime() + 3 * 3600000).toISOString();
+
   const ausencias: Tabelas['ausencias'][] = [
     { id: uuid(), pessoa_id: carla.id, tipo: 'ferias', inicio: addDias(7), fim: addDias(21), substituto_id: bruno.id, observacao: 'Férias programadas', delegado: false, devolvido: false, criado_por: ana.id, criado_em: iso(-10) },
     { id: uuid(), pessoa_id: henrique.id, tipo: 'folga', inicio: addDias(-12), fim: addDias(-11), substituto_id: igor.id, observacao: null, delegado: false, devolvido: false, criado_por: gabriela.id, criado_em: iso(-20) },
@@ -121,7 +167,7 @@ export function gerarDadosDemo() {
     comentarios: [{ id: uuid(), atividade_id: byTit('Revisão de NCM dos produtos', fis).id, texto: 'Pausei até o Comercial enviar a lista de produtos novos.', autor_id: carla.id, criado_em: iso(-2, 15) }],
     anexos: [], notificacoes, ausencias,
     integracoes: [{ id: 1, email_ativo: true, teams_ativo: false, app_url: typeof location !== 'undefined' ? location.origin + location.pathname : 'http://localhost:8080' }],
-    teams_webhooks: [], envios: [],
+    teams_webhooks: [], envios: [], metas,
     __senhas: senhas, __seq: seq,
   };
   return db;

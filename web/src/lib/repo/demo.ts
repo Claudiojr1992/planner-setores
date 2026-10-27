@@ -8,7 +8,7 @@ import { ErroApp, type Filtro, type Repo, type Sessao } from './repo';
 import { gerarDadosDemo, SENHA_DEMO } from './seed';
 
 type Banco = { [K in NomeTabela]: Tabelas[K][] } & { __senhas: Record<string, string>; __seq: number };
-const CHAVE = 'planner.demo.v2';
+const CHAVE = 'planner.demo.v3';
 const CHAVE_SESSAO = 'planner.demo.sessao';
 const LIMITE_ARQUIVO = 2 * 1024 * 1024;
 

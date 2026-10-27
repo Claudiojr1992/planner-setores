@@ -9,7 +9,7 @@ import type { Anexo, Atividade, Dados, Perfil, Prioridade } from '../lib/types';
 import {
   FINAIS, PRIORIDADE, STATUS, aberta, addDias, atividadesDoProcesso, atrasada, ausenciaAtiva, destinosPermitidos,
   etapasEmOrdem, fmtData, fmtDataCurta, fmtDataHora, gere, hoje, podeExecutar, primeiroNome, proximosNos, tempoRelativo, venceHoje,
-  validarFluxo,
+  validarFluxo, slaAtividade, diasUteisEntre, ymd,
 } from '../lib/regras';
 import type { Detalhe, NovaAtividade } from '../lib/servico';
 import { useApp, useDados } from '../app/contexto';
@@ -106,11 +106,20 @@ export function Cartao({ a, arrastavel = false, acoes = true, mostrarSetor = fal
       {etapa && <div className="meta ellipsis" title={f?.nome}><LuWorkflow size={12} />{etapa.titulo}</div>}
       <div className="meta">
         {mostrarResp && (r ? <><Avatar p={r} setores={dados.setores} tam="p" /><span>{primeiroNome(r.nome)}</span>{aus && <span className="pill t-purple">ausente</span>}</> : <span>Sem responsável</span>)}
-        <Prazo a={a} />
+        <AlertaSla a={a} /><Prazo a={a} />
       </div>
       {acoes && <AcoesRapidas a={a} />}
     </div>
   );
+}
+
+/** Alerta de SLA: só aparece quando está em risco ou estourado (para não poluir a fila). */
+export function AlertaSla({ a }: { a: Atividade }) {
+  const { dados } = useDados();
+  if (!aberta(a)) return null;
+  const s = slaAtividade(a, dados.metas);
+  if (s.situacao !== 'em_risco' && s.situacao !== 'estourado') return null;
+  return <span className={`pill ${s.situacao === 'estourado' ? 't-red' : 't-amber'}`} title={`SLA de ${s.dias} dias úteis até ${fmtData(ymd(s.limite))} (${Math.round(s.consumo * 100)}% do prazo usado)`}>{s.situacao === 'estourado' ? 'SLA estourado' : 'SLA em risco'}</span>;
 }
 
 export function Prazo({ a }: { a: Atividade }) {
@@ -129,7 +138,7 @@ export function LinhaAtividade({ a, mostrarResp = false, acoes = true }: { a: At
     <span className="cor" />
     <div className="corpo">
       <div className="l1"><span className="numero">#{a.numero}</span><span className="t" title={a.titulo}>{a.titulo}</span><Pri p={a.prioridade} /></div>
-      <div className="l2">{a.status !== 'em_andamento' && a.status !== 'na_fila' && <PillStatus s={a.status} />}<Elo nos={nos} />{mostrarResp && <span className="row" style={{ gap: 5 }}><Avatar p={r} setores={dados.setores} tam="p" />{r ? primeiroNome(r.nome) : 'sem responsável'}</span>}<Prazo a={a} /></div>
+      <div className="l2">{a.status !== 'em_andamento' && a.status !== 'na_fila' && <PillStatus s={a.status} />}<Elo nos={nos} /><AlertaSla a={a} />{mostrarResp && <span className="row" style={{ gap: 5 }}><Avatar p={r} setores={dados.setores} tam="p" />{r ? primeiroNome(r.nome) : 'sem responsável'}</span>}<Prazo a={a} /></div>
     </div>
     {acoes && <div className="fim" onClick={e => e.stopPropagation()}><AcoesRapidas a={a} compacto /></div>}
   </div>;
@@ -275,6 +284,7 @@ export function DetalheAtividade() {
           <dl className="dl">
             <dt>Responsável</dt><dd className="row">{pessoa(a.responsavel_id) ? <><Avatar p={pessoa(a.responsavel_id)} setores={dados.setores} tam="p" />{pessoa(a.responsavel_id)?.nome}</> : <span className="muted">Sem responsável</span>}</dd>
             <dt>Início / prazo</dt><dd>{fmtData(a.inicio)} → <b style={{ color: atrasada(a) ? 'var(--red)' : undefined }}>{fmtData(a.prazo)}</b></dd>
+            <dt>SLA</dt><dd><LinhaSla a={a} /></dd>
             <dt>Solicitado por</dt><dd>{pessoa(a.criado_por)?.nome || '—'}{a.solicitante_setor_id && a.solicitante_setor_id !== a.setor_id && <> · {dados.setores.find(x => x.id === a.solicitante_setor_id)?.nome}</>}</dd>
             <dt>Criada em</dt><dd>{fmtDataHora(a.criado_em)}</dd>
             {a.iniciado_em && <><dt>Iniciada em</dt><dd>{fmtDataHora(a.iniciado_em)}</dd></>}
@@ -365,6 +375,18 @@ function ProximoPasso({ a }: { a: Atividade }) {
     <div className="txt"><b>{titulo}</b>{texto && <span>{texto}</span>}</div>
     {distribuir ? <MenuDistribuir a={a} /> : p && <button className={`btn ${p.perigo ? '' : 'pri'}`} onClick={p.fn}><p.Ic size={15} />{p.rotulo}</button>}
   </div>;
+}
+
+function LinhaSla({ a }: { a: Atividade }) {
+  const { dados } = useDados();
+  const s = slaAtividade(a, dados.metas);
+  if (s.situacao === 'sem_sla') return <span className="muted">Não se aplica ({STATUS[a.status].rotulo.toLowerCase()})</span>;
+  const du = diasUteisEntre(new Date(), s.limite);
+  const tom = { no_prazo: 't-green', cumprido: 't-green', em_risco: 't-amber', estourado: 't-red', violado: 't-red', sem_sla: 't-gray' }[s.situacao];
+  const rot = { no_prazo: 'No prazo', cumprido: 'Cumprido', em_risco: 'Em risco', estourado: 'Estourado', violado: 'Entregue fora do SLA', sem_sla: '' }[s.situacao];
+  return <span className="row wrap" style={{ gap: 8 }}><span className={`pill ${tom}`}>{rot}</span>
+    <span>{s.dias} dias úteis · até <b>{fmtData(ymd(s.limite))}</b></span>
+    {aberta(a) && <span className="muted">{du > 0 ? `faltam ${du} dia${du > 1 ? 's' : ''} úteis` : du === 0 ? 'vence hoje' : `estourou há ${-du} dia${du < -1 ? 's' : ''} úteis`}</span>}</span>;
 }
 
 /* ===================== modais ===================== */

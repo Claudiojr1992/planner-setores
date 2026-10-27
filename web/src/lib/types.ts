@@ -43,6 +43,8 @@ export interface Atividade {
   fluxo_id: string | null; etapa_id: string | null; encaminhar_para: string | null;
   motivo: string | null; responsavel_original_id: string | null;
   iniciado_em: string | null; concluido_em: string | null; criado_em: string; atualizado_em: string;
+  /** Momento em que o gestor aceitou a solicitação (SLA de aceite). */
+  aceito_em?: string | null;
 }
 
 export interface Historico { id: string; atividade_id: string; texto: string; autor_id: string | null; criado_em: string }
@@ -60,6 +62,15 @@ export interface Ausencia {
   substituto_id: string | null; observacao: string | null; delegado: boolean; devolvido: boolean;
   criado_por: string | null; criado_em: string;
 }
+/** Prazo de atendimento (SLA) em dias úteis por prioridade. */
+export type SlaDias = Record<Prioridade, number>;
+/** Metas e SLA de um setor (setor_id = null → padrão da empresa). */
+export interface Meta {
+  id: string; setor_id: string | null;
+  sla_dias: SlaDias; sla_aceite_horas: number;
+  meta_sla_pct: number; meta_concluidas_mes: number | null;
+  criado_em: string; atualizado_em?: string;
+}
 export interface Integracoes { id: number; email_ativo: boolean; teams_ativo: boolean; app_url: string }
 export interface TeamsWebhook { id: string; setor_id: string | null; url: string; ativo: boolean; criado_em: string }
 export interface Envio {
@@ -73,7 +84,7 @@ export interface Tabelas {
   empresa: Empresa; perfis: Perfil; setores: Setor; vinculos: Vinculo; fluxos: Fluxo;
   atividades: Atividade; historico: Historico; comentarios: Comentario; anexos: Anexo;
   notificacoes: Notificacao; ausencias: Ausencia; integracoes: Integracoes;
-  teams_webhooks: TeamsWebhook; envios: Envio;
+  teams_webhooks: TeamsWebhook; envios: Envio; metas: Meta;
 }
 export type NomeTabela = keyof Tabelas;
 
@@ -83,4 +94,5 @@ export interface Dados {
   perfis: Perfil[]; setores: Setor[]; vinculos: Vinculo[]; fluxos: Fluxo[];
   atividades: Atividade[]; notificacoes: Notificacao[]; ausencias: Ausencia[];
   integracoes: Integracoes;
+  metas: Meta[];
 }
